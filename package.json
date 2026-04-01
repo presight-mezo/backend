@@ -1,10 +1,11 @@
 {
   "name": "backend",
   "version": "1.0.0",
+  "type": "module",
   "engines": {
     "node": ">=20.0.0"
   },
-  "main": "index.js",
+  "main": "dist/src/index.js",
   "directories": {
     "doc": "docs",
     "test": "test"
