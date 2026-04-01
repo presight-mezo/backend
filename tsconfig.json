@@ -11,8 +11,9 @@
     "resolveJsonModule": true,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "rootDir": "src"
   },
-  "include": ["./src", "./scripts", "./hardhat.config.ts"],
-  "exclude": ["./test", "node_modules", "dist"]
+  "include": ["./src"],
+  "exclude": ["./test", "node_modules", "dist", "scripts", "hardhat.config.ts"]
 }
