@@ -1,0 +1,477 @@
+{
+	"info": {
+		"_postman_id": "7f8b9c4d-5e6f-4a3b-9c8d-1eef2a3b4c5d",
+		"name": "Presight Backend API",
+		"description": "API collection for the Presight prediction market backend on Mezo Testnet.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Groups",
+			"item": [
+				{
+					"name": "Create Group",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{siwe_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Bitcoin Maxis\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/groups",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"groups"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Group Detail",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/groups/:groupId",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"groups",
+								":groupId"
+							],
+							"variable": [
+								{
+									"key": "groupId",
+									"value": "0x..."
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Join Group",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{siwe_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/groups/:groupId/join",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"groups",
+								":groupId",
+								"join"
+							],
+							"variable": [
+								{
+									"key": "groupId",
+									"value": "0x..."
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Group Leaderboard",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/groups/:groupId/leaderboard",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"groups",
+								":groupId",
+								"leaderboard"
+							],
+							"variable": [
+								{
+									"key": "groupId",
+									"value": "0x..."
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Markets",
+			"item": [
+				{
+					"name": "Create Market",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{siwe_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"groupId\": \"0x...\",\n  \"question\": \"Will BTC close above $100K this week?\",\n  \"deadline\": \"2026-04-10T23:59:59Z\",\n  \"mode\": \"full-stake\",\n  \"resolverAddress\": \"0x...\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/markets",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"markets"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Market Detail",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/markets/:marketId",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"markets",
+								":marketId"
+							],
+							"variable": [
+								{
+									"key": "marketId",
+									"value": "0x..."
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List Markets for Group",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/markets?groupId=0x...",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"markets"
+							],
+							"query": [
+								{
+									"key": "groupId",
+									"value": "0x..."
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Stakes",
+			"item": [
+				{
+					"name": "Place Stake",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{siwe_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"marketId\": \"0x...\",\n  \"direction\": \"YES\",\n  \"amount\": \"10000000000000000000\",\n  \"mode\": \"full-stake\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/stakes",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"stakes"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List Stakes for Market",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/stakes?marketId=0x...",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"stakes"
+							],
+							"query": [
+								{
+									"key": "marketId",
+									"value": "0x..."
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Mandates",
+			"item": [
+				{
+					"name": "Register Mandate",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{siwe_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"limitPerMarket\": \"100000000000000000000\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/mandate",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"mandate"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Current Mandate",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{siwe_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/mandate",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"mandate"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Revoke Mandate",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{siwe_token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/mandate",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"mandate"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Resolver",
+			"item": [
+				{
+					"name": "Resolve Market",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{siwe_token}}",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"outcome\": \"YES\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{base_url}}/resolver/:marketId/resolve",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"resolver",
+								":marketId",
+								"resolve"
+							],
+							"variable": [
+								{
+									"key": "marketId",
+									"value": "0x..."
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Profile",
+			"item": [
+				{
+					"name": "Get User Profile",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/profile/:address",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"profile",
+								":address"
+							],
+							"variable": [
+								{
+									"key": "address",
+									"value": "0x..."
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Health Check",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/health",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"health"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:3001/api/v1",
+			"type": "string"
+		},
+		{
+			"key": "siwe_token",
+			"value": "YOUR_SIWE_TOKEN_HERE",
+			"type": "string"
+		}
+	]
+}
