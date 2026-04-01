@@ -6,7 +6,46 @@ import { ethers } from "ethers";
 
 const router = Router();
 
-/** POST /markets — Create a new YES/NO prediction market */
+/**
+ * @swagger
+ * tags:
+ *   name: Markets
+ *   description: Prediction markets for YES/NO questions
+ */
+
+/**
+ * @swagger
+ * /api/v1/markets:
+ *   post:
+ *     summary: Create a new prediction market (Relayed)
+ *     tags: [Markets]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               groupId:
+ *                 type: string
+ *               question:
+ *                 type: string
+ *               deadline:
+ *                 type: string
+ *                 format: date-time
+ *               resolverAddress:
+ *                 type: string
+ *               mode:
+ *                 type: string
+ *                 enum: [full-stake, zero-risk]
+ *     responses:
+ *       201:
+ *         description: Market created
+ *       400:
+ *         description: Bad Request
+ */
 router.post("/", requireAuth, async (req: Request, res: Response) => {
   const { groupId, question, deadline, mode, resolverAddress } = req.body;
 
@@ -55,7 +94,24 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
-/** GET /markets/:marketId — Get market detail with live pool totals */
+/**
+ * @swagger
+ * /api/v1/markets/{marketId}:
+ *   get:
+ *     summary: Get detailed market information
+ *     tags: [Markets]
+ *     parameters:
+ *       - in: path
+ *         name: marketId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Market details retrieved
+ *       404:
+ *         description: Market not found
+ */
 router.get("/:marketId", (req: Request, res: Response) => {
   const market = marketsDb.get(req.params.marketId as string);
   if (!market) {
@@ -83,7 +139,24 @@ router.get("/:marketId", (req: Request, res: Response) => {
   });
 });
 
-/** GET /markets?groupId=:id — List markets for a group */
+/**
+ * @swagger
+ * /api/v1/markets:
+ *   get:
+ *     summary: List all markets in a group
+ *     tags: [Markets]
+ *     parameters:
+ *       - in: query
+ *         name: groupId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: List of markets
+ *       400:
+ *         description: Bad Request
+ */
 router.get("/", (req: Request, res: Response) => {
   const { groupId } = req.query;
   if (!groupId) {

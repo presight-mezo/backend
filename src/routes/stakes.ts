@@ -8,12 +8,50 @@ import { broadcast } from "../services/websocket.js";
 const router = Router();
 
 /**
- * POST /stakes
- * Place a YES/NO stake on a market.
- *
- * Middleware chain: requireAuth → validateMandate → handler
- *
- * Body: { marketId, direction: "YES"|"NO", amount: string (MUSD wei), mode: "full-stake"|"zero-risk" }
+ * @swagger
+ * tags:
+ *   name: Stakes
+ *   description: Relayed staking for prediction markets
+ */
+
+/**
+ * @swagger
+ * /api/v1/stakes:
+ *   post:
+ *     summary: Place a YES/NO stake (Relayed/Gasless)
+ *     tags: [Stakes]
+ *     security:
+ *       - bearerAuth: []
+ *     description: Requires a valid SIWE session and an active Passport Mandate for the user.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               marketId:
+ *                 type: string
+ *               direction:
+ *                 type: string
+ *                 enum: [YES, NO]
+ *               amount:
+ *                 type: string
+ *                 description: Amount in MUSD wei (as string to avoid precision loss)
+ *               mode:
+ *                 type: string
+ *                 enum: [full-stake, zero-risk]
+ *     responses:
+ *       201:
+ *         description: Stake placed successfully via relay
+ *       400:
+ *         description: Bad Request / Market Closed / Insufficient Mandate
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Market not found
+ *       409:
+ *         description: Already staked on this market
  */
 router.post("/", requireAuth, validateMandate, async (req: Request, res: Response) => {
   const userAddress = req.userAddress!;
@@ -106,8 +144,22 @@ router.post("/", requireAuth, validateMandate, async (req: Request, res: Respons
 });
 
 /**
- * GET /stakes?marketId=:id
- * List all stakes for a market.
+ * @swagger
+ * /api/v1/stakes:
+ *   get:
+ *     summary: List all stakes for a specific market
+ *     tags: [Stakes]
+ *     parameters:
+ *       - in: query
+ *         name: marketId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: List of stakes retrieved
+ *       400:
+ *         description: marketId required
  */
 router.get("/", (req: Request, res: Response) => {
   const { marketId } = req.query;

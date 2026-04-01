@@ -7,13 +7,41 @@ import { ethers } from "ethers";
 const router = Router();
 
 /**
- * POST /mandate
- * Register or update a Prediction Mandate for the authenticated user.
- *
- * Body: { limitPerMarket: string (MUSD wei), txHash?: string }
- *
- * If txHash is provided: trust the user already registered on-chain, just store it.
- * If no txHash: relay calls MandateValidator.registerMandate() via deployer wallet.
+ * @swagger
+ * tags:
+ *   name: Mandate
+ *   description: Registration and management of user prediction mandates
+ */
+
+/**
+ * @swagger
+ * /api/v1/mandate:
+ *   post:
+ *     summary: Register or update a prediction mandate (Relayed)
+ *     tags: [Mandate]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               limitPerMarket:
+ *                 type: string
+ *                 description: Spending limit in MUSD wei
+ *                 example: "1000000000000000000000"
+ *               txHash:
+ *                 type: string
+ *                 description: Optional. On-chain transaction hash if already registered by client.
+ *     responses:
+ *       201:
+ *         description: Mandate registered successfully
+ *       400:
+ *         description: Bad Request
+ *       401:
+ *         description: Unauthorized
  */
 router.post("/", requireAuth, async (req: Request, res: Response) => {
   const userAddress = req.userAddress!;
@@ -63,8 +91,20 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
 });
 
 /**
- * GET /mandate
- * Get the current mandate for the authenticated user.
+ * @swagger
+ * /api/v1/mandate:
+ *   get:
+ *     summary: Get current active mandate for the user
+ *     tags: [Mandate]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Mandate details retrieved
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: No active mandate found
  */
 router.get("/", requireAuth, (req: Request, res: Response) => {
   const userAddress = req.userAddress!;
@@ -86,8 +126,18 @@ router.get("/", requireAuth, (req: Request, res: Response) => {
 });
 
 /**
- * DELETE /mandate
- * Revoke the authenticated user's mandate.
+ * @swagger
+ * /api/v1/mandate:
+ *   delete:
+ *     summary: Revoke the current mandate
+ *     tags: [Mandate]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Mandate revoked successfully
+ *       401:
+ *         description: Unauthorized
  */
 router.delete("/", requireAuth, (req: Request, res: Response) => {
   mandatesDb.revoke(req.userAddress!);

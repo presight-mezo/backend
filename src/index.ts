@@ -11,6 +11,8 @@ import { migrateDb } from "./db/schema.js";
 import { initWebSocket } from "./services/websocket.js";
 import { startContractEventListener } from "./services/contractEvents.js";
 import { errorHandler } from "./middleware/errorHandler.js";
+import swaggerJsdoc from "swagger-jsdoc";
+import swaggerUi from "swagger-ui-express";
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 import groupsRouter   from "./routes/groups.js";
@@ -30,6 +32,35 @@ const app = express();
 app.use(cors({ origin: CORS_ORIGIN, credentials: true }));
 app.use(morgan("dev"));
 app.use(express.json());
+
+// ── Swagger ──────────────────────────────────────────────────────────────────
+const swaggerOptions = {
+  definition: {
+    openapi: "3.0.0",
+    info: {
+      title: "Presight API",
+      version: "1.0.0",
+      description: "Interactive API documentation for the Presight prediction market protocol.",
+    },
+    servers: [
+      { url: "http://localhost:3001", description: "Local Development" },
+      { url: "https://presight-mezo.onrender.com", description: "Production" },
+    ],
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT",
+        },
+      },
+    },
+  },
+  apis: ["./src/routes/*.ts", "./dist/src/routes/*.js"],
+};
+
+const swaggerSpec = swaggerJsdoc(swaggerOptions);
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get("/health", (_, res) => {

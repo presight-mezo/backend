@@ -8,10 +8,49 @@ import { predictionMarket } from "../config.js";
 const router = Router();
 
 /**
- * POST /resolver/:marketId/resolve
- * Trusted resolver triggers resolution. Verifies on-chain resolver role.
- *
- * Body: { outcome: "YES" | "NO" }
+ * @swagger
+ * tags:
+ *   name: Resolver
+ *   description: Market resolution and settlement by trusted resolvers
+ */
+
+/**
+ * @swagger
+ * /api/v1/resolver/{marketId}/resolve:
+ *   post:
+ *     summary: Resolve a market with an outcome (Relayed)
+ *     tags: [Resolver]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: marketId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               outcome:
+ *                 type: string
+ *                 enum: [YES, NO]
+ *     responses:
+ *       200:
+ *         description: Market resolved and rewards distributed
+ *       400:
+ *         description: Bad Request
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Not the assigned resolver
+ *       404:
+ *         description: Market not found
+ *       409:
+ *         description: Already resolved
  */
 router.post("/:marketId/resolve", requireAuth, async (req: Request, res: Response) => {
   const marketId = req.params.marketId as string;

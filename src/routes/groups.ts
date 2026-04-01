@@ -6,7 +6,39 @@ import { broadcast } from "../services/websocket.js";
 
 const router = Router();
 
-/** POST /groups — Create a new prediction group */
+/**
+ * @swagger
+ * tags:
+ *   name: Groups
+ *   description: Groups for shared prediction markets
+ */
+
+/**
+ * @swagger
+ * /api/v1/groups:
+ *   post:
+ *     summary: Create a new prediction group (Relayed)
+ *     tags: [Groups]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: Mezo Alpha Testers
+ *     responses:
+ *       201:
+ *         description: Group created successfully
+ *       400:
+ *         description: Bad Request
+ *       401:
+ *         description: Unauthorized
+ */
 router.post("/", requireAuth, async (req: Request, res: Response) => {
   const { name } = req.body;
   if (!name?.trim()) {
@@ -32,7 +64,24 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
-/** GET /groups/:groupId — Get group metadata, members, leaderboard */
+/**
+ * @swagger
+ * /api/v1/groups/{groupId}:
+ *   get:
+ *     summary: Get group metadata and leaderboard
+ *     tags: [Groups]
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Group details retrieved
+ *       404:
+ *         description: Group not found
+ */
 router.get("/:groupId", (req: Request, res: Response) => {
   const groupId = req.params.groupId as string;
   const group = groupsDb.get(groupId);
@@ -62,7 +111,28 @@ router.get("/:groupId", (req: Request, res: Response) => {
   });
 });
 
-/** POST /groups/:groupId/join — Join a group */
+/**
+ * @swagger
+ * /api/v1/groups/{groupId}/join:
+ *   post:
+ *     summary: Join an existing group
+ *     tags: [Groups]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Successfully joined group
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Group not found
+ */
 router.post("/:groupId/join", requireAuth, (req: Request, res: Response) => {
   const groupId = req.params.groupId as string;
   const group = groupsDb.get(groupId);
@@ -83,7 +153,24 @@ router.post("/:groupId/join", requireAuth, (req: Request, res: Response) => {
   res.json({ success: true, memberCount: count });
 });
 
-/** GET /leaderboard/:groupId — Group leaderboard sorted by Conviction Score */
+/**
+ * @swagger
+ * /api/v1/groups/{groupId}/leaderboard:
+ *   get:
+ *     summary: Get rank-sorted leaderboard for a group
+ *     tags: [Groups]
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Leaderboard retrieved
+ *       404:
+ *         description: Group not found
+ */
 router.get("/:groupId/leaderboard", (req: Request, res: Response) => {
   const groupId = req.params.groupId as string;
   const entries = scoresDb.getLeaderboard(groupId).map((e: any, i: number) => ({
