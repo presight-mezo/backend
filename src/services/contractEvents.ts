@@ -2,71 +2,82 @@ import { ethers } from "ethers";
 import {
   predictionMarket,
   provider,
-  PREDICTION_MARKET_ABI,
 } from "../config.js";
-import { marketsDb, stakesDb } from "../db/schema.js";
+import { marketsDb, stakesDb, syncDb } from "../db/schema.js";
 import { broadcast } from "./websocket.js";
 
-export function startContractEventListener() {
-  console.log("[events] Starting contract event listener...");
+const POLLING_INTERVAL = 12000; // 12 seconds
+const CHUNK_SIZE = 1000;       // blocks per poll
 
-  const iface = new ethers.Interface(PREDICTION_MARKET_ABI);
+export async function startContractEventListener() {
+  console.log("[events] Starting robust contract event sync...");
 
-  // ── StakePlaced — sync pool totals to DB ─────────────────────────────────────
-  predictionMarket.on(
-    "StakePlaced",
-    async (marketId: string, staker: string, direction: boolean, amount: bigint) => {
-      try {
-        marketsDb.updatePool(marketId, direction, amount.toString());
-        const market = marketsDb.get(marketId);
-        if (!market) return;
+  let lastProcessedBlock = syncDb.getLastBlock();
+  if (lastProcessedBlock === 0) {
+    // Start from current block if no history
+    lastProcessedBlock = await provider.getBlockNumber();
+    syncDb.updateLastBlock(lastProcessedBlock);
+    console.log(`[events] No sync history found. Starting from current block: ${lastProcessedBlock}`);
+  } else {
+    console.log(`[events] Resuming sync from block: ${lastProcessedBlock}`);
+  }
 
-        broadcast(market.group_id, "market:updated", {
-          marketId,
-          yesPool:          market.yes_pool,
-          noPool:           market.no_pool,
-          participantCount: stakesDb.getByMarket(marketId).length,
-        });
+  // Periodic polling loop
+  setInterval(async () => {
+    try {
+      const currentBlock = await provider.getBlockNumber();
+      if (currentBlock <= lastProcessedBlock) return;
 
-        console.log(`[events] StakePlaced: market=${marketId} staker=${staker} direction=${direction} amount=${amount}`);
-      } catch (err) {
-        console.error("[events] StakePlaced handler error:", err);
+      const toBlock = Math.min(lastProcessedBlock + CHUNK_SIZE, currentBlock);
+      console.log(`[events] Syncing logs: ${lastProcessedBlock + 1} -> ${toBlock}`);
+
+      // 1. Fetch StakePlaced logs
+      const stakeLogs = await predictionMarket.queryFilter("StakePlaced", lastProcessedBlock + 1, toBlock);
+      for (const log of stakeLogs) {
+        const [marketId, staker, direction, amount] = (log as any).args;
+        try {
+          marketsDb.updatePool(marketId, direction, amount.toString());
+          const market = marketsDb.get(marketId);
+          if (market) {
+            broadcast(market.group_id, "market:updated", {
+              marketId,
+              yesPool:          market.yes_pool,
+              noPool:           market.no_pool,
+              participantCount: stakesDb.getByMarket(marketId).length,
+            });
+          }
+          console.log(`[events] StakePlaced sync: market=${marketId} staker=${staker} amount=${amount}`);
+        } catch (err) {
+          console.error(`[events] Failed to process StakePlaced log:`, err);
+        }
       }
-    }
-  );
 
-  // ── MarketResolved ────────────────────────────────────────────────────────────
-  predictionMarket.on(
-    "MarketResolved",
-    async (marketId: string, outcome: boolean, totalPool: bigint, feeAmount: bigint) => {
-      try {
-        marketsDb.resolve(marketId, outcome);
-        const market = marketsDb.get(marketId);
-        if (!market) return;
-
-        broadcast(market.group_id, "market:resolved", {
-          marketId,
-          outcome: outcome ? "YES" : "NO",
-          totalPool:   totalPool.toString(),
-          feeDeducted: feeAmount.toString(),
-        });
-
-        console.log(`[events] MarketResolved: market=${marketId} outcome=${outcome}`);
-      } catch (err) {
-        console.error("[events] MarketResolved handler error:", err);
+      // 2. Fetch MarketResolved logs
+      const resolveLogs = await predictionMarket.queryFilter("MarketResolved", lastProcessedBlock + 1, toBlock);
+      for (const log of resolveLogs) {
+        const [marketId, outcome, totalPool, feeAmount] = (log as any).args;
+        try {
+          marketsDb.resolve(marketId, outcome);
+          const market = marketsDb.get(marketId);
+          if (market) {
+            broadcast(market.group_id, "market:resolved", {
+              marketId,
+              outcome: outcome ? "YES" : "NO",
+              totalPool:   totalPool.toString(),
+              feeDeducted: feeAmount.toString(),
+            });
+          }
+          console.log(`[events] MarketResolved sync: market=${marketId} outcome=${outcome}`);
+        } catch (err) {
+          console.error(`[events] Failed to process MarketResolved log:`, err);
+        }
       }
-    }
-  );
 
-  // ── RewardsDistributed ────────────────────────────────────────────────────────
-  predictionMarket.on(
-    "RewardsDistributed",
-    async (marketId: string, winnerCount: bigint, netPool: bigint) => {
-      const market = marketsDb.get(marketId);
-      if (!market) return;
-      console.log(`[events] RewardsDistributed: market=${marketId} winners=${winnerCount} netPool=${netPool}`);
+      // Update sync progress
+      lastProcessedBlock = toBlock;
+      syncDb.updateLastBlock(toBlock);
+    } catch (err: any) {
+      console.error("[events] Polling loop error:", err.message);
     }
-  );
-
-  console.log("[events] Listening for: StakePlaced, MarketResolved, RewardsDistributed");
+  }, POLLING_INTERVAL);
 }

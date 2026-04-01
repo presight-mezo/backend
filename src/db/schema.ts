@@ -63,6 +63,11 @@ export function migrateDb() {
       last_updated   TEXT DEFAULT (datetime('now')),
       PRIMARY KEY (user_address, group_id)
     );
+
+    CREATE TABLE IF NOT EXISTS sync (
+      id         TEXT PRIMARY KEY,
+      last_block INTEGER NOT NULL DEFAULT 0
+    );
   `);
 }
 
@@ -251,5 +256,21 @@ export const scoresDb = {
       // UPDATE params
       delta.score, delta.marketsPlayed, delta.wins, delta.totalStaked, delta.totalWon
     );
+  },
+};
+
+// ── Sync CRUD ─────────────────────────────────────────────────────────────────
+
+export const syncDb = {
+  getLastBlock(id: string = "main"): number {
+    const row = db.prepare("SELECT last_block FROM sync WHERE id = ?").get(id) as any;
+    return row?.last_block ?? 0;
+  },
+
+  updateLastBlock(block: number, id: string = "main") {
+    db.prepare(`
+      INSERT INTO sync (id, last_block) VALUES (?, ?)
+      ON CONFLICT (id) DO UPDATE SET last_block = excluded.last_block
+    `).run(id, block);
   },
 };
