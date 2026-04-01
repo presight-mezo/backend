@@ -40,41 +40,49 @@ presight-backend/
 ├── contracts/                        # Solidity smart contracts
 │   ├── PredictionMarket.sol          # Core: escrow, staking, resolution, fee routing
 │   ├── GroupRegistry.sol             # Group creation, membership, resolver assignment
-│   └── MandateValidator.sol          # Mezo Passport mandate scope verification
-├── scripts/
-│   ├── deploy.js                     # Hardhat deploy script (all 3 contracts)
-│   └── verify.js                     # Mezo Testnet contract verification
+│   ├── MandateValidator.sol          # Mezo Passport mandate scope verification
+│   └── mocks/MockERC20.sol           # Mock MUSD token for testing
+├── scripts/                          # Utility & deployment scripts
+│   ├── deploy.js                     # Core testnet deployment wrapper
+│   ├── deploy-mock-musd.js           # Independent MUSD deployment (hackathon)
+│   ├── diagnose-stake.js             # On-chain state diagnostics
+│   ├── generate-siwe-token.ts        # Fast auth token generation for E2E
+│   └── verify.ts                     # Mezo Explorer contract verification
+├── deployments/                      # Deployed contract address JSON
+│   ├── mezoTestnet.json          
+│   └── sandbox.json              
 ├── test/
-│   ├── PredictionMarket.test.ts      # Full stake, fee routing, auto-distribution tests
-│   ├── GroupRegistry.test.ts         # Group creation, membership, resolver role tests
-│   └── MandateValidator.test.ts      # Mandate scope enforcement tests
+│   ├── PredictionMarket.test.ts      # Unit tests
+│   ├── GroupRegistry.test.ts         
+│   ├── MandateValidator.test.ts      
+│   └── e2e/                          # End-to-end live blockchain tests
+│       └── stake-and-distribute.ts   
 ├── src/
 │   ├── index.ts                      # Express + WebSocket server entry point
 │   ├── config.ts                     # Contract addresses, chain config, env
 │   ├── db/
-│   │   ├── schema.ts                 # Database schema definitions
-│   │   └── client.ts                 # DB connection (pg or better-sqlite3)
+│   │   ├── schema.ts                 # Database schema & SQLite DAO models
+│   │   └── client.ts                 # SQLite connection logic
 │   ├── routes/
 │   │   ├── groups.ts                 # Group CRUD API
 │   │   ├── markets.ts                # Market CRUD API
-│   │   ├── stakes.ts                 # Stake execution
-│   │   ├── resolver.ts               # Resolution triggers
+│   │   ├── stakes.ts                 # Stake execution & Zero Risk routing
+│   │   ├── mandate.ts                # Mezo Passport Mandate registration
+│   │   ├── resolver.ts               # Resolution triggers & scoring logic
 │   │   ├── yield.ts                  # Yield simulation endpoints
-│   │   └── profile.ts                # Profile and leaderboard API
+│   │   └── profile.ts                # Conviction Score analytics API
 │   ├── services/
-│   │   ├── passport.ts               # Mezo Passport SDK logic
-│   │   ├── mandateValidator.ts       # Server-side mandate checks
-│   │   ├── yieldSimulator.ts         # Zero Risk Mode logic
-│   │   ├── convictionScore.ts        # Scoring algorithm
-│   │   ├── contractEvents.ts         # On-chain event listener
-│   │   └── websocket.ts              # WS broadcasting service
+│   │   ├── passport.ts               # Relayer logic to Mezo blockchain
+│   │   ├── yieldSimulator.ts         # Zero Risk background interval engine
+│   │   ├── contractEvents.ts         # ethers.js on-chain event listener
+│   │   └── websocket.ts              # WS broadcasting engine
 │   ├── middleware/
-│   │   ├── auth.ts                   # SIWE Signature verification
-│   │   ├── rateLimit.ts              # Spam protection
-│   │   └── errorHandler.ts           # Global error handling
+│   │   ├── auth.ts                   # SIWE Signature & optionalAuth checking
+│   │   ├── validateMandate.ts        # Server-side mandate constraint checking
+│   │   └── errorHandler.ts           # Global Express error catching
 │   └── types/
-│       ├── contracts.ts              # Contract ABIs/Types
-│       └── api.ts                    # API interface definitions
+│       └── ...                       # Interfaces
+├── docs/                             # Architecture & API documentation
 ├── hardhat.config.cjs                # Hardhat config (CommonJS)
 ├── .env.example                      # ENV template
 └── railway.json                      # Deployment config
