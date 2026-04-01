@@ -1,0 +1,255 @@
+import { db } from "./client.js";
+
+// ── Schema Migrations ─────────────────────────────────────────────────────────
+
+export function migrateDb() {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS groups (
+      id           TEXT PRIMARY KEY,
+      name         TEXT NOT NULL,
+      admin_address TEXT NOT NULL,
+      created_at   TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS group_members (
+      group_id  TEXT NOT NULL REFERENCES groups(id),
+      address   TEXT NOT NULL,
+      joined_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (group_id, address)
+    );
+
+    CREATE TABLE IF NOT EXISTS markets (
+      id               TEXT PRIMARY KEY,
+      group_id         TEXT NOT NULL REFERENCES groups(id),
+      question         TEXT NOT NULL,
+      deadline         TEXT NOT NULL,
+      resolver_address TEXT NOT NULL,
+      mode             TEXT NOT NULL DEFAULT 'full-stake', -- 'full-stake' | 'zero-risk'
+      status           TEXT NOT NULL DEFAULT 'OPEN',       -- 'OPEN' | 'RESOLVED'
+      outcome          TEXT,                               -- 'YES' | 'NO' | NULL
+      yes_pool         TEXT NOT NULL DEFAULT '0',
+      no_pool          TEXT NOT NULL DEFAULT '0',
+      created_at       TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS stakes (
+      id           TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+      market_id    TEXT NOT NULL REFERENCES markets(id),
+      user_address TEXT NOT NULL,
+      direction    TEXT NOT NULL, -- 'YES' | 'NO'
+      amount       TEXT NOT NULL, -- MUSD wei as string
+      mode         TEXT NOT NULL,
+      tx_hash      TEXT NOT NULL,
+      staked_at    TEXT DEFAULT (datetime('now')),
+      UNIQUE (market_id, user_address)
+    );
+
+    CREATE TABLE IF NOT EXISTS mandates (
+      user_address     TEXT PRIMARY KEY,
+      limit_per_market TEXT NOT NULL, -- MUSD wei as string
+      tx_hash          TEXT NOT NULL,
+      registered_at    TEXT DEFAULT (datetime('now')),
+      revoked          INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS conviction_scores (
+      user_address   TEXT NOT NULL,
+      group_id       TEXT NOT NULL REFERENCES groups(id),
+      score          INTEGER NOT NULL DEFAULT 0,
+      markets_played INTEGER NOT NULL DEFAULT 0,
+      wins           INTEGER NOT NULL DEFAULT 0,
+      total_staked   TEXT NOT NULL DEFAULT '0',
+      total_won      TEXT NOT NULL DEFAULT '0',
+      last_updated   TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (user_address, group_id)
+    );
+  `);
+}
+
+// ── Mandate CRUD ──────────────────────────────────────────────────────────────
+
+export interface MandateRecord {
+  user_address: string;
+  limit_per_market: string;
+  tx_hash: string;
+}
+
+export const mandatesDb = {
+  get(userAddress: string): MandateRecord & { revoked: number } | undefined {
+    return db
+      .prepare("SELECT * FROM mandates WHERE user_address = ? AND revoked = 0")
+      .get(userAddress.toLowerCase()) as any;
+  },
+
+  upsert(data: MandateRecord) {
+    db.prepare(`
+      INSERT INTO mandates (user_address, limit_per_market, tx_hash, revoked)
+      VALUES (?, ?, ?, 0)
+      ON CONFLICT (user_address) DO UPDATE SET
+        limit_per_market = excluded.limit_per_market,
+        tx_hash          = excluded.tx_hash,
+        registered_at    = datetime('now'),
+        revoked          = 0
+    `).run(data.user_address.toLowerCase(), data.limit_per_market, data.tx_hash);
+  },
+
+  revoke(userAddress: string) {
+    db.prepare("UPDATE mandates SET revoked = 1 WHERE user_address = ?")
+      .run(userAddress.toLowerCase());
+  },
+};
+
+// ── Groups CRUD ───────────────────────────────────────────────────────────────
+
+export const groupsDb = {
+  get(groupId: string) {
+    return db.prepare("SELECT * FROM groups WHERE id = ?").get(groupId) as any;
+  },
+
+  create(id: string, name: string, adminAddress: string) {
+    db.prepare("INSERT INTO groups (id, name, admin_address) VALUES (?, ?, ?)")
+      .run(id, name, adminAddress.toLowerCase());
+  },
+
+  addMember(groupId: string, address: string) {
+    db.prepare(`
+      INSERT OR IGNORE INTO group_members (group_id, address) VALUES (?, ?)
+    `).run(groupId, address.toLowerCase());
+  },
+
+  isMember(groupId: string, address: string): boolean {
+    const row = db
+      .prepare("SELECT 1 FROM group_members WHERE group_id = ? AND address = ?")
+      .get(groupId, address.toLowerCase());
+    return !!row;
+  },
+
+  memberCount(groupId: string): number {
+    const row = db
+      .prepare("SELECT COUNT(*) as cnt FROM group_members WHERE group_id = ?")
+      .get(groupId) as any;
+    return row?.cnt ?? 0;
+  },
+
+  members(groupId: string) {
+    return db
+      .prepare("SELECT address, joined_at FROM group_members WHERE group_id = ? ORDER BY joined_at ASC")
+      .all(groupId) as any[];
+  },
+};
+
+// ── Markets CRUD ──────────────────────────────────────────────────────────────
+
+export const marketsDb = {
+  get(marketId: string) {
+    return db.prepare("SELECT * FROM markets WHERE id = ?").get(marketId) as any;
+  },
+
+  getByGroup(groupId: string) {
+    return db
+      .prepare("SELECT * FROM markets WHERE group_id = ? ORDER BY status = 'OPEN' DESC, deadline ASC")
+      .all(groupId) as any[];
+  },
+
+  create(data: {
+    id: string; groupId: string; question: string; deadline: string;
+    resolverAddress: string; mode: string;
+  }) {
+    db.prepare(`
+      INSERT INTO markets (id, group_id, question, deadline, resolver_address, mode)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(data.id, data.groupId, data.question, data.deadline,
+           data.resolverAddress.toLowerCase(), data.mode);
+  },
+
+  updatePool(marketId: string, direction: boolean, amount: string) {
+    const col = direction ? "yes_pool" : "no_pool";
+    db.prepare(`
+      UPDATE markets SET ${col} = CAST(CAST(${col} AS INTEGER) + CAST(? AS INTEGER) AS TEXT)
+      WHERE id = ?
+    `).run(amount, marketId);
+  },
+
+  resolve(marketId: string, outcome: boolean) {
+    db.prepare(`
+      UPDATE markets SET status = 'RESOLVED', outcome = ?
+      WHERE id = ?
+    `).run(outcome ? "YES" : "NO", marketId);
+  },
+};
+
+// ── Stakes CRUD ───────────────────────────────────────────────────────────────
+
+export const stakesDb = {
+  getByMarket(marketId: string) {
+    return db
+      .prepare("SELECT * FROM stakes WHERE market_id = ?")
+      .all(marketId) as any[];
+  },
+
+  hasStaked(marketId: string, userAddress: string): boolean {
+    const row = db
+      .prepare("SELECT 1 FROM stakes WHERE market_id = ? AND user_address = ?")
+      .get(marketId, userAddress.toLowerCase());
+    return !!row;
+  },
+
+  create(data: {
+    marketId: string; userAddress: string; direction: string;
+    amount: string; mode: string; txHash: string;
+  }) {
+    db.prepare(`
+      INSERT INTO stakes (market_id, user_address, direction, amount, mode, tx_hash)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(data.marketId, data.userAddress.toLowerCase(), data.direction,
+           data.amount, data.mode, data.txHash);
+  },
+
+  getById(stakeId: string) {
+    return db.prepare("SELECT * FROM stakes WHERE id = ?").get(stakeId) as any;
+  },
+};
+
+// ── Conviction Scores ─────────────────────────────────────────────────────────
+
+export const scoresDb = {
+  get(userAddress: string, groupId: string) {
+    return db
+      .prepare("SELECT * FROM conviction_scores WHERE user_address = ? AND group_id = ?")
+      .get(userAddress.toLowerCase(), groupId) as any;
+  },
+
+  getLeaderboard(groupId: string) {
+    return db
+      .prepare(`
+        SELECT user_address, score, markets_played, wins, total_staked, total_won
+        FROM conviction_scores
+        WHERE group_id = ?
+        ORDER BY score DESC
+        LIMIT 100
+      `)
+      .all(groupId) as any[];
+  },
+
+  increment(userAddress: string, groupId: string, delta: {
+    score: number; marketsPlayed: number; wins: number;
+    totalStaked: string; totalWon: string;
+  }) {
+    db.prepare(`
+      INSERT INTO conviction_scores (user_address, group_id, score, markets_played, wins, total_staked, total_won)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT (user_address, group_id) DO UPDATE SET
+        score          = score + ?,
+        markets_played = markets_played + ?,
+        wins           = wins + ?,
+        total_staked   = CAST(CAST(total_staked AS INTEGER) + CAST(? AS INTEGER) AS TEXT),
+        total_won      = CAST(CAST(total_won AS INTEGER) + CAST(? AS INTEGER) AS TEXT),
+        last_updated   = datetime('now')
+    `).run(
+      userAddress.toLowerCase(), groupId,
+      delta.score, delta.marketsPlayed, delta.wins, delta.totalStaked, delta.totalWon,
+      // UPDATE params
+      delta.score, delta.marketsPlayed, delta.wins, delta.totalStaked, delta.totalWon
+    );
+  },
+};

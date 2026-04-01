@@ -1,0 +1,12 @@
+node_modules/
+.env
+presight.db
+presight.db-shm
+presight.db-wal
+artifacts/
+cache/
+typechain-types/
+dist/
+coverage/
+*.log
+.DS_Store
