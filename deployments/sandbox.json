@@ -1,0 +1,12 @@
+{
+  "network": "mezoTestnet",
+  "chainId": 31611,
+  "deployedAt": "2026-04-01T11:57:48.452Z",
+  "addresses": {
+    "MUSD": "0xD21b624B9CAc4f51490E8267e6A2347bBdD99f6C",
+    "MandateValidator": "0x86b8800Bb0A936472CEcd5E210585e5BF82eDE0A",
+    "PredictionMarket": "0x6393d8c064CFF5664F334a80816Dce1252e724cE",
+    "GroupRegistry": "0x57A7371cE4D1877D50124Aef114b74Dea1AE5D95",
+    "protocolFeeAddress": "0x53A4441309d747DC378d001fD92a2a949d84BB49"
+  }
+}

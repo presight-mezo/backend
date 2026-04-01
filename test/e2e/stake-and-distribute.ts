@@ -37,7 +37,7 @@ const walletA  = new ethers.Wallet(
 const WALLET_B_PK = process.env.WALLET_B_PRIVATE_KEY;
 const walletB = WALLET_B_PK
   ? new ethers.Wallet(WALLET_B_PK.startsWith("0x") ? WALLET_B_PK : `0x${WALLET_B_PK}`, provider)
-  : null;
+  : ethers.Wallet.createRandom(provider);
 
 const STAKE_AMOUNT = ethers.parseEther("10"); // 10 mock MUSD each
 
@@ -87,8 +87,7 @@ async function main() {
   console.log("  Presight E2E: Fresh Deploy + Stake + Distribution");
   console.log("══════════════════════════════════════════════════════\n");
   console.log(`  Wallet A: ${walletA.address}`);
-  if (walletB) console.log(`  Wallet B: ${walletB.address}`);
-  else         console.log(`  ⚠️  No WALLET_B_PRIVATE_KEY — single wallet mode`);
+  console.log(`  Wallet B: ${walletB.address}`);
   console.log();
 
   // ── Step 0: Deploy contracts ────────────────────────────────────────────────
@@ -144,13 +143,19 @@ async function main() {
   // Mint 10000 tMUSD for Wallet A
   await (await (mockMusd_W as any).mint(walletA.address, ethers.parseEther("10000"))).wait();
   const balA = await musd.balanceOf(walletA.address);
-  pass(`Wallet A: ${ethers.formatEther(balA)} tMUSD`);
+  pass(`Wallet A (tMUSD): ${ethers.formatEther(balA)}`);
 
-  if (walletB) {
-    await (await (mockMusd_W as any).mint(walletB.address, ethers.parseEther("10000"))).wait();
-    const balB = await musd.balanceOf(walletB.address);
-    pass(`Wallet B: ${ethers.formatEther(balB)} tMUSD`);
-  }
+  // Fund Wallet B with gas (0.0001 BTC) and MUSD
+  const fundTx = await walletA.sendTransaction({
+    to: walletB.address,
+    value: ethers.parseEther("0.0001") // testnet BTC for gas
+  });
+  await fundTx.wait();
+  pass(`Wallet B funded with gas (0.0001 tBTC)`);
+
+  await (await (mockMusd_W as any).mint(walletB.address, ethers.parseEther("10000"))).wait();
+  const balB = await musd.balanceOf(walletB.address);
+  pass(`Wallet B (tMUSD): ${ethers.formatEther(balB)}`);
 
   const feeBefore = await musd.balanceOf(FEE_ADDR);
   console.log(`  Fee addr: ${ethers.formatEther(feeBefore)} tMUSD`);
@@ -175,11 +180,9 @@ async function main() {
   await (await mvTyped.registerMandate(walletA.address, ethers.parseEther("100"))).wait();
   pass(`Wallet A mandate: 100 tMUSD limit`);
 
-  if (walletB) {
-    const mvB = new ethers.Contract(mvAddr, MV_ABI, walletB);
-    await (await mvB.registerMandate(walletB.address, ethers.parseEther("100"))).wait();
-    pass(`Wallet B mandate: 100 tMUSD limit`);
-  }
+  const mvB = new ethers.Contract(mvAddr, MV_ABI, walletB);
+  await (await mvB.registerMandate(walletB.address, ethers.parseEther("100"))).wait();
+  pass(`Wallet B mandate: 100 tMUSD limit`);
 
   // ── Step 4: Create Market ──────────────────────────────────────────────────
   section("4. Create Market");
@@ -211,13 +214,11 @@ async function main() {
   await (await pmTyped.stake(marketId, true /* YES */, STAKE_AMOUNT)).wait();
   pass(`Wallet A staked YES: ${ethers.formatEther(STAKE_AMOUNT)} tMUSD`);
 
-  if (walletB) {
-    const musdB = new ethers.Contract(mockMusdAddr, MOCK_ERC20_ABI, walletB);
-    await (await musdB.approve(pmAddr, ethers.MaxUint256)).wait();
-    const pmB   = new ethers.Contract(pmAddr, PM_ABI, walletB);
-    await (await pmB.stake(marketId, false /* NO */, STAKE_AMOUNT)).wait();
-    pass(`Wallet B staked NO: ${ethers.formatEther(STAKE_AMOUNT)} tMUSD`);
-  }
+  const musdB = new ethers.Contract(mockMusdAddr, MOCK_ERC20_ABI, walletB);
+  await (await musdB.approve(pmAddr, ethers.MaxUint256)).wait();
+  const pmB   = new ethers.Contract(pmAddr, PM_ABI, walletB);
+  await (await pmB.stake(marketId, false /* NO */, STAKE_AMOUNT)).wait();
+  pass(`Wallet B staked NO: ${ethers.formatEther(STAKE_AMOUNT)} tMUSD`);
 
   // ── Step 6: Verify On-Chain Pool ───────────────────────────────────────────
   section("6. Verify Pool");
@@ -258,20 +259,12 @@ async function main() {
   console.log(`  Expected fee:    ${ethers.formatEther(expectedFee)} tMUSD (1%)`);
 
   const feeReceived = feeAfter - feeBefore2;
-  if (feeReceived >= expectedFee) pass(`Protocol fee routed correctly: ${ethers.formatEther(feeReceived)} tMUSD ✓`);
+  if (feeReceived >= expectedFee) pass(`Protocol fee routed correctly (1%): ${ethers.formatEther(feeReceived)} tMUSD ✓`);
   else fail(`Fee mismatch: expected ${ethers.formatEther(expectedFee)}, got ${ethers.formatEther(feeReceived)}`);
 
-  if (walletB) {
-    const gain = walletAAfter - walletABefore;
-    if (gain > 0n) pass(`Wallet A (winner) gained ${ethers.formatEther(gain)} tMUSD ✓`);
-    else           fail(`Wallet A did not gain tMUSD`);
-  } else {
-    console.log(`  (Single-wallet: Wallet A is both sides; net ≈ -fee of ${ethers.formatEther(expectedFee)} tMUSD)`);
-    const net = walletAAfter - walletABefore;
-    const expectedNet = 0n - expectedFee; // lost the fee
-    if (net >= expectedNet - ethers.parseEther("0.01")) pass(`Net balance consistent with 1% fee deduction ✓`);
-    else fail(`Unexpected balance change: ${ethers.formatEther(net)} tMUSD`);
-  }
+  const gain = walletAAfter - walletABefore;
+  if (gain > 0n) pass(`Winner (Wallet A) net gain: ${ethers.formatEther(gain)} tMUSD ✓ (Includes Loser's stake minus fee)`);
+  else           fail(`Winner (Wallet A) did not gain tMUSD`);
 
   // ─── Summary ───────────────────────────────────────────────────────────────
   console.log("\n══════════════════════════════════════════════════════");
