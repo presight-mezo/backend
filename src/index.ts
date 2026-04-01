@@ -21,6 +21,8 @@ import stakesRouter   from "./routes/stakes.js";
 import mandateRouter  from "./routes/mandate.js";
 import resolverRouter from "./routes/resolver.js";
 import profileRouter  from "./routes/profile.js";
+import yieldRouter    from "./routes/yield.js";
+import { startYieldSimulator } from "./services/yieldSimulator.js";
 
 // ── Bootstrap DB ──────────────────────────────────────────────────────────────
 migrateDb();
@@ -74,6 +76,7 @@ app.use(`${BASE}/stakes`,   stakesRouter);
 app.use(`${BASE}/mandate`,  mandateRouter);
 app.use(`${BASE}/resolver`, resolverRouter);
 app.use(`${BASE}/profile`,  profileRouter);
+app.use(`${BASE}/yield`,    yieldRouter);
 
 // ── Global Error Handler ──────────────────────────────────────────────────────
 app.use(errorHandler);
@@ -88,5 +91,6 @@ server.listen(PORT, () => {
   console.log(`[server] CORS origin: ${CORS_ORIGIN}`);
 });
 
-// ── Contract Event Listener ───────────────────────────────────────────────────
+// ── Contract Event Listener & Background Services ───────────
 startContractEventListener();
+startYieldSimulator();

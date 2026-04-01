@@ -117,8 +117,8 @@ export async function relayStake(params: StakeParams): Promise<string> {
     direction === "YES",
     amount
   );
-  const receipt = await tx.wait();
-  return receipt.hash;
+  // Return immediately upon RPC acceptance (mempool) to meet <= 500ms latency target
+  return tx.hash;
 }
 
 // ── Relay: Market Creation ────────────────────────────────────────────────────

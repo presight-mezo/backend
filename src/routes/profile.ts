@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { stakesDb, scoresDb } from "../db/schema.js";
+import { scoresDb } from "../db/schema.js";
 
 const router = Router();
 
@@ -12,11 +12,16 @@ const router = Router();
 
 /**
  * @swagger
- * /api/v1/profile/{address}:
+ * /api/v1/profile/{groupId}/{address}:
  *   get:
- *     summary: Get public stats for a user address
+ *     summary: Get conviction score and public stats for a user in a specific group
  *     tags: [Profile]
  *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *         schema:
+ *           type: string
  *       - in: path
  *         name: address
  *         required: true
@@ -25,21 +30,41 @@ const router = Router();
  *     responses:
  *       200:
  *         description: Profile data retrieved
+ *       404:
+ *         description: Profile not found for this group
  */
-router.get("/:address", (req: Request, res: Response) => {
+router.get("/:groupId/:address", (req: Request, res: Response) => {
   const address = (req.params.address as string).toLowerCase();
-  const stakes  = stakesDb.getByMarket(""); // placeholder — need market data
+  const groupId = req.params.groupId as string;
+  
+  const scoreRecord = scoresDb.get(address, groupId);
 
-  // Simplified profile: just aggregate across all DB data
-  // In production, join properly across groups
+  if (!scoreRecord) {
+    // If user has never staked/scored in this group, return baseline zeros
+    res.json({
+      address,
+      groupId,
+      marketsPlayed: 0,
+      winRate:       0,
+      totalStaked:   "0",
+      totalWon:      "0",
+      convictionScore: 0,
+    });
+    return;
+  }
+
+  const winRate = scoreRecord.markets_played > 0 
+    ? scoreRecord.wins / scoreRecord.markets_played 
+    : 0;
+
   res.json({
     address,
-    marketsPlayed: 0,
-    winRate:       0,
-    totalStaked:   "0",
-    totalWon:      "0",
-    convictionScore: 0,
-    recentMarkets: [],
+    groupId,
+    marketsPlayed:   scoreRecord.markets_played,
+    winRate:         winRate,
+    totalStaked:     scoreRecord.total_staked,
+    totalWon:        scoreRecord.total_won,
+    convictionScore: scoreRecord.score,
   });
 });
 

@@ -64,6 +64,13 @@ export function migrateDb() {
       PRIMARY KEY (user_address, group_id)
     );
 
+    CREATE TABLE IF NOT EXISTS trove_positions (
+      user_address   TEXT PRIMARY KEY,
+      trove_balance  TEXT NOT NULL, -- BTC collateral
+      musd_balance   TEXT NOT NULL,
+      updated_at     TEXT DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS sync (
       id         TEXT PRIMARY KEY,
       last_block INTEGER NOT NULL DEFAULT 0
@@ -154,6 +161,18 @@ export const marketsDb = {
     return db
       .prepare("SELECT * FROM markets WHERE group_id = ? ORDER BY status = 'OPEN' DESC, deadline ASC")
       .all(groupId) as any[];
+  },
+
+  getByResolverAndStatus(resolverAddress: string, status: string) {
+    return db
+      .prepare("SELECT * FROM markets WHERE resolver_address = ? AND status = ? ORDER BY deadline ASC")
+      .all(resolverAddress.toLowerCase(), status) as any[];
+  },
+
+  getOpenZeroRisk() {
+    return db
+      .prepare("SELECT * FROM markets WHERE mode = 'zero-risk' AND status = 'OPEN'")
+      .all() as any[];
   },
 
   create(data: {
@@ -272,5 +291,26 @@ export const syncDb = {
       INSERT INTO sync (id, last_block) VALUES (?, ?)
       ON CONFLICT (id) DO UPDATE SET last_block = excluded.last_block
     `).run(id, block);
+  },
+};
+
+// ── Troves CRUD ───────────────────────────────────────────────────────────────
+
+export const trovesDb = {
+  get(userAddress: string) {
+    return db
+      .prepare("SELECT * FROM trove_positions WHERE user_address = ?")
+      .get(userAddress.toLowerCase()) as any;
+  },
+
+  upsert(userAddress: string, troveBalance: string, musdBalance: string) {
+    db.prepare(`
+      INSERT INTO trove_positions (user_address, trove_balance, musd_balance)
+      VALUES (?, ?, ?)
+      ON CONFLICT (user_address) DO UPDATE SET
+        trove_balance = excluded.trove_balance,
+        musd_balance  = excluded.musd_balance,
+        updated_at    = datetime('now')
+    `).run(userAddress.toLowerCase(), troveBalance, musdBalance);
   },
 };

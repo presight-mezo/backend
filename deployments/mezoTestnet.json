@@ -1,12 +1,13 @@
 {
   "network": "mezoTestnet",
   "chainId": 31611,
-  "deployedAt": "2026-04-01T15:00:00Z",
+  "deployedAt": "2026-04-01T18:36:49.567Z",
+  "deployer": "0xf7E8f9889Ab6B96443ce6acd31B3001B5aD4eCAA",
   "addresses": {
-    "PredictionMarket": "0x24dF80CA332b7E229724E5D66092c4B292cE7dd7",
-    "GroupRegistry":    "0x2c4BA85a6272f7f492139EacD5F06f3b8D7D0a66",
-    "MandateValidator": "0x3a673A4ADc1a5d75309A83F715db519F0fa09B0A",
-    "MUSD":             "0x118917a40FAF1CD7a13dB0Ef56C86De7973Ac503",
+    "PredictionMarket": "0xEee0e4b9dAe28Dd47089c8D0f00Aac93a4739292",
+    "GroupRegistry": "0xBEf42ca5c35EDB69CB338A0fdBfF0a1F2f944aB7",
+    "MandateValidator": "0x99e0dA1A24bD8661C5794Ee1b77b83304A97DdB5",
+    "MUSD": "0x507Ac33B7B1332b4488AE772fB116cb2E0EA0511",
     "ProtocolFeeAddress": "0x53A4441309d747DC378d001fD92a2a949d84BB49"
   }
 }

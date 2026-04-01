@@ -1,9 +1,10 @@
 import { Router, Request, Response } from "express";
-import { requireAuth } from "../middleware/auth.js";
+import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { validateMandate } from "../middleware/validateMandate.js";
-import { marketsDb, stakesDb } from "../db/schema.js";
+import { marketsDb, stakesDb, trovesDb } from "../db/schema.js";
 import { relayStake } from "../services/passport.js";
 import { broadcast } from "../services/websocket.js";
+import { calculateYield } from "../services/yieldSimulator.js";
 
 const router = Router();
 
@@ -58,8 +59,8 @@ router.post("/", requireAuth, validateMandate, async (req: Request, res: Respons
   const { marketId, direction, amount, mode } = req.body;
 
   // ── Validate request body ────────────────────────────────────────────────────
-  if (!marketId || !direction || !amount) {
-    res.status(400).json({ error: "BAD_REQUEST", message: "marketId, direction, and amount are required" });
+  if (!marketId || !direction) {
+    res.status(400).json({ error: "BAD_REQUEST", message: "marketId and direction are required" });
     return;
   }
   if (direction !== "YES" && direction !== "NO") {
@@ -88,38 +89,64 @@ router.post("/", requireAuth, validateMandate, async (req: Request, res: Respons
     return;
   }
 
+  // ── Zero Risk Amount Override ────────────────────────────────────────────────
+  let finalAmount = BigInt(amount || 0);
+
+  if (market.mode === "zero-risk") {
+    let trove = trovesDb.get(userAddress);
+    if (!trove) {
+      // Auto-mock 5 BTC for MVP demo
+      const mockTroveBalance = "50000000000000000000000"; 
+      trovesDb.upsert(userAddress, mockTroveBalance, "10000000000000000000");
+      trove = trovesDb.get(userAddress);
+    }
+    const accruedYield = calculateYield(BigInt(trove.trove_balance), new Date(market.created_at));
+    if (accruedYield <= 0n) {
+      res.status(400).json({ error: "ZERO_YIELD", message: "You have not accrued any yield to stake yet." });
+      return;
+    }
+    finalAmount = accruedYield;
+  } else if (finalAmount <= 0n) {
+    res.status(400).json({ error: "BAD_REQUEST", message: "amount is required and must be > 0 for full-stake mode" });
+    return;
+  }
+
   try {
     // ── Execute stake via relay ──────────────────────────────────────────────────
     const txHash = await relayStake({
       userAddress,
       marketId,
       direction: direction as "YES" | "NO",
-      amount: BigInt(amount),
+      amount: finalAmount,
     });
 
     // ── Persist to DB ────────────────────────────────────────────────────────────
     const stakeMode = mode ?? "full-stake";
+    const amountStr = finalAmount.toString();
     stakesDb.create({
       marketId,
       userAddress,
       direction,
-      amount,
+      amount: amountStr,
       mode: stakeMode,
       txHash,
     });
 
     // Update market pool totals in DB
-    marketsDb.updatePool(marketId, direction === "YES", amount);
+    marketsDb.updatePool(marketId, direction === "YES", amountStr);
 
     // ── WebSocket broadcast ──────────────────────────────────────────────────────
     const updatedMarket = marketsDb.get(marketId);
+    
+    // Obfuscate participant data for non-stakers in the WS feed
     broadcast(market.group_id, "stake:placed", {
       marketId,
       direction,
-      amount,
-      userAddress,
+      amount: "???",
+      userAddress: "0x***",
       txHash,
       timestamp: new Date().toISOString(),
+      isRevealed: false
     });
     broadcast(market.group_id, "market:updated", {
       marketId,
@@ -133,7 +160,7 @@ router.post("/", requireAuth, validateMandate, async (req: Request, res: Respons
       txHash,
       marketId,
       direction,
-      amount,
+      amount: amountStr,
       mode:       stakeMode,
       executedAt: new Date().toISOString(),
     });
@@ -161,14 +188,39 @@ router.post("/", requireAuth, validateMandate, async (req: Request, res: Respons
  *       400:
  *         description: marketId required
  */
-router.get("/", (req: Request, res: Response) => {
+router.get("/", optionalAuth, (req: Request, res: Response) => {
   const { marketId } = req.query;
+  const userAddress = req.userAddress;
+
   if (!marketId) {
     res.status(400).json({ error: "BAD_REQUEST", message: "marketId query param required" });
     return;
   }
-  const stakes = stakesDb.getByMarket(marketId as string);
-  res.json({ stakes });
+  
+  const mId = marketId as string;
+  const rawStakes = stakesDb.getByMarket(mId);
+  
+  // Reveal logic: only show stakes if the user has already staked on this market
+  const hasStaked = userAddress ? stakesDb.hasStaked(mId, userAddress) : false;
+
+  const stakes = rawStakes.map(s => {
+    // Always reveal the user's own stake to themselves
+    if (userAddress && s.user_address.toLowerCase() === userAddress.toLowerCase()) {
+      return s;
+    }
+    
+    // Otherwise, mask if not structurally revealed
+    if (!hasStaked) {
+      return {
+        ...s,
+        user_address: "0x***",
+        amount: "???",
+      };
+    }
+    return s;
+  });
+
+  res.json({ stakes, isRevealed: hasStaked });
 });
 
 export default router;

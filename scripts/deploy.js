@@ -1,6 +1,15 @@
-import { ethers } from "hardhat";
-import * as fs from "fs";
-import * as path from "path";
+import pkg from "hardhat";
+const { ethers } = pkg;
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import * as dotenv from "dotenv";
+
+// Helper for __dirname in ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config();
 
 async function main() {
   const [deployer] = await ethers.getSigners();
@@ -10,23 +19,23 @@ async function main() {
   const network = await ethers.provider.getNetwork();
   console.log("Network:", network.name, "| Chain ID:", network.chainId.toString());
 
-  // ── 1. Deploy MandateValidator ──────────────────────────────────────────────
-  console.log("\n1/3 Deploying MandateValidator...");
+  // 1. Deploy MandateValidator
+  console.log("\n1/4 Deploying MandateValidator...");
   const MandateValidator = await ethers.getContractFactory("MandateValidator");
   const mandateValidator = await MandateValidator.deploy();
   await mandateValidator.waitForDeployment();
   const mandateValidatorAddress = await mandateValidator.getAddress();
   console.log("   MandateValidator deployed at:", mandateValidatorAddress);
 
-  // ── 2. Deploy GroupRegistry ─────────────────────────────────────────────────
-  console.log("\n2/3 Deploying GroupRegistry...");
+  // 2. Deploy GroupRegistry
+  console.log("\n2/4 Deploying GroupRegistry...");
   const GroupRegistry = await ethers.getContractFactory("GroupRegistry");
   const groupRegistry = await GroupRegistry.deploy();
   await groupRegistry.waitForDeployment();
   const groupRegistryAddress = await groupRegistry.getAddress();
   console.log("   GroupRegistry deployed at:", groupRegistryAddress);
 
-  // ── 3. Deploy PredictionMarket ──────────────────────────────────────────────
+  // 3. Deploy PredictionMarket
   const musdAddress        = process.env.MUSD_ADDRESS;
   const protocolFeeAddress = process.env.MEZO_PROTOCOL_FEE_ADDRESS;
 
@@ -36,7 +45,7 @@ async function main() {
     );
   }
 
-  console.log("\n3/3 Deploying PredictionMarket...");
+  console.log("\n3/4 Deploying PredictionMarket...");
   console.log("   MUSD address:         ", musdAddress);
   console.log("   Protocol fee address: ", protocolFeeAddress);
   console.log("   MandateValidator:     ", mandateValidatorAddress);
@@ -51,14 +60,14 @@ async function main() {
   const predictionMarketAddress = await predictionMarket.getAddress();
   console.log("   PredictionMarket deployed at:", predictionMarketAddress);
 
-  // ── 4. Wire: setPredictionMarket on MandateValidator ───────────────────────
+  // 4. Wire: setPredictionMarket on MandateValidator
   console.log("\n4/4 Wiring PredictionMarket → MandateValidator...");
   const setTx = await mandateValidator.setPredictionMarket(predictionMarketAddress);
   await setTx.wait();
   console.log("   Done. predictionMarket set in MandateValidator.");
 
-  // ── 5. Save deployment addresses ───────────────────────────────────────────
-  const deployments: Record<string, Record<string, string>> = {};
+  // 5. Save deployment addresses
+  const deployments = {};
   const deploymentsPath = path.join(__dirname, "../deployments/mezoTestnet.json");
   if (fs.existsSync(deploymentsPath)) {
     Object.assign(deployments, JSON.parse(fs.readFileSync(deploymentsPath, "utf8")));
@@ -74,7 +83,7 @@ async function main() {
     GroupRegistry:         groupRegistryAddress,
     PredictionMarket:      predictionMarketAddress,
     MUSD:                  musdAddress,
-    protocolFeeAddress,
+    protocolFeeAddress:    protocolFeeAddress,
   };
 
   fs.mkdirSync(path.dirname(deploymentsPath), { recursive: true });
@@ -82,7 +91,7 @@ async function main() {
   console.log("\n✅ Deployment complete! Addresses saved to deployments/mezoTestnet.json");
   console.log(JSON.stringify(deployments[chainKey], null, 2));
 
-  // ── 6. Print env vars to copy ──────────────────────────────────────────────
+  // 6. Print env vars for manual update
   console.log("\n── Copy these to .env ────────────────────────────────────────");
   console.log(`MANDATE_VALIDATOR_ADDRESS=${mandateValidatorAddress}`);
   console.log(`GROUP_REGISTRY_ADDRESS=${groupRegistryAddress}`);

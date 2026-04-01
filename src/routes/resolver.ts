@@ -16,6 +16,43 @@ const router = Router();
 
 /**
  * @swagger
+ * /api/v1/resolver/notifications:
+ *   get:
+ *     summary: Get notifications for markets requiring resolution by the caller
+ *     tags: [Resolver]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of markets that need resolution
+ *       401:
+ *         description: Unauthorized
+ */
+router.get("/notifications", requireAuth, (req: Request, res: Response) => {
+  const userAddress = req.userAddress!;
+  
+  // Fetch markets where the resolver is the current user and status is OPEN
+  const pendingMarkets = marketsDb.getByResolverAndStatus(userAddress, "OPEN");
+
+  // Filter for markets that are past their deadline, or approaching it (e.g. within 24 hours)
+  const now = Date.now();
+  const notifications = pendingMarkets.map((m: any) => {
+    const deadlineMs = new Date(m.deadline).getTime();
+    const isPastDeadline = now >= deadlineMs;
+    return {
+      marketId: m.id,
+      groupId: m.group_id,
+      question: m.question,
+      deadline: m.deadline,
+      isResponseRequired: isPastDeadline, // True if deadline has passed and it needs resolution
+    };
+  });
+
+  res.json({ notifications });
+});
+
+/**
+ * @swagger
  * /api/v1/resolver/{marketId}/resolve:
  *   post:
  *     summary: Resolve a market with an outcome (Relayed)

@@ -73,6 +73,25 @@ export async function startContractEventListener() {
         }
       }
 
+      // 3. Fetch RewardsDistributed logs
+      const rewardLogs = await predictionMarket.queryFilter("RewardsDistributed", lastProcessedBlock + 1, toBlock);
+      for (const log of rewardLogs) {
+        const [marketId, winnerCount, netPool] = (log as any).args;
+        try {
+          const market = marketsDb.get(marketId);
+          if (market) {
+            broadcast(market.group_id, "rewards:distributed", {
+              marketId,
+              winnerCount: winnerCount.toString(),
+              netPool: netPool.toString(),
+            });
+          }
+          console.log(`[events] RewardsDistributed sync: market=${marketId} winners=${winnerCount} netPool=${netPool}`);
+        } catch (err) {
+          console.error(`[events] Failed to process RewardsDistributed log:`, err);
+        }
+      }
+
       // Update sync progress
       lastProcessedBlock = toBlock;
       syncDb.updateLastBlock(toBlock);

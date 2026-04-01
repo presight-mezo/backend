@@ -1,22 +1,23 @@
-import { HardhatUserConfig } from "hardhat/types";
-import "@nomicfoundation/hardhat-toolbox";
-import * as dotenv from "dotenv";
-
-dotenv.config();
+require("@nomicfoundation/hardhat-toolbox");
+require("dotenv").config();
 
 const DEPLOYER_PRIVATE_KEY = process.env.DEPLOYER_PRIVATE_KEY ?? "";
-const MEZO_RPC_URL = process.env.MEZO_RPC_URL ?? "https://rpc.testnet.mezo.org";
+const MEZO_RPC_URL = process.env.MEZO_RPC_URL ?? "https://rpc.test.mezo.org";
 const MEZO_EXPLORER_API_KEY = process.env.MEZO_EXPLORER_API_KEY ?? "placeholder";
 
-const config: HardhatUserConfig = {
+/** @type import('hardhat/config').HardhatUserConfig */
+module.exports = {
   solidity: {
     version: "0.8.24",
     settings: {
-      optimizer: { enabled: true, runs: 200 },
+      optimizer: {
+        enabled: true,
+        runs: 200,
+      },
     },
   },
   networks: {
-    hardhat: {}, // local test network
+    hardhat: {},
     mezoTestnet: {
       url: MEZO_RPC_URL,
       accounts: DEPLOYER_PRIVATE_KEY ? [DEPLOYER_PRIVATE_KEY] : [],
@@ -38,6 +39,9 @@ const config: HardhatUserConfig = {
       },
     ],
   },
+  tsnode: {
+    esm: true,
+  },
   paths: {
     sources: "./contracts",
     tests: "./test",
@@ -45,5 +49,3 @@ const config: HardhatUserConfig = {
     artifacts: "./artifacts",
   },
 };
-
-export default config;
