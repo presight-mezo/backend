@@ -6,7 +6,7 @@ import * as dotenv from "dotenv";
 
 dotenv.config();
 
-import { PORT, CORS_ORIGIN } from "./config.js";
+import { PORT, CORS_ORIGIN, BASE_URL } from "./config.js";
 import { migrateDb } from "./db/schema.js";
 import { initWebSocket } from "./services/websocket.js";
 import { startContractEventListener } from "./services/contractEvents.js";
@@ -43,8 +43,7 @@ const swaggerOptions = {
       description: "Interactive API documentation for the Presight prediction market protocol.",
     },
     servers: [
-      { url: "http://localhost:3001", description: "Local Development" },
-      { url: "https://presight-mezo.onrender.com", description: "Production" },
+      { url: BASE_URL, description: "Current Environment" },
     ],
     components: {
       securitySchemes: {

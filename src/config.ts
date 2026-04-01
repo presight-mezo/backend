@@ -44,6 +44,7 @@ export const deployerSigner = new ethers.Wallet(
 export const PORT        = parseInt(process.env.PORT ?? "3001", 10);
 export const CORS_ORIGIN = process.env.CORS_ORIGIN ?? "http://localhost:3000";
 export const SIWE_DOMAIN = process.env.SIWE_DOMAIN ?? "localhost:3000";
+export const BASE_URL    = process.env.BASE_URL ?? `http://localhost:${PORT}`;
 
 // ── ABIs (minimal — functions we call server-side) ───────────────────────────
 
