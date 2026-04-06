@@ -20,16 +20,16 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
   const token = authHeader.slice(7);
   try {
-    const { message, signature } = JSON.parse(
-      Buffer.from(token, "base64").toString("utf8")
-    );
+    const decoded = Buffer.from(token, "base64").toString("utf8");
+    const { message, signature } = JSON.parse(decoded);
     const siweMessage = new SiweMessage(message);
     const result = await siweMessage.verify({ signature, domain: SIWE_DOMAIN });
     if (!result.success) throw new Error("SIWE verify failed");
     req.userAddress = result.data.address.toLowerCase();
     next();
-  } catch {
-    res.status(401).json({ error: "INVALID_TOKEN", message: "Token invalid or expired" });
+  } catch (err: any) {
+    console.error("[auth] SIWE verification failed:", err.message);
+    res.status(401).json({ error: "INVALID_TOKEN", message: err.message || "Token invalid or expired" });
   }
 }
 

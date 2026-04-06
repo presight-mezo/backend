@@ -22,6 +22,7 @@ import mandateRouter  from "./routes/mandate.js";
 import resolverRouter from "./routes/resolver.js";
 import profileRouter  from "./routes/profile.js";
 import yieldRouter    from "./routes/yield.js";
+import troveRouter    from "./routes/trove.js";
 import { startYieldSimulator } from "./services/yieldSimulator.js";
 
 // ── Bootstrap DB ──────────────────────────────────────────────────────────────
@@ -77,6 +78,7 @@ app.use(`${BASE}/mandate`,  mandateRouter);
 app.use(`${BASE}/resolver`, resolverRouter);
 app.use(`${BASE}/profile`,  profileRouter);
 app.use(`${BASE}/yield`,    yieldRouter);
+app.use(`${BASE}/trove`,    troveRouter);
 
 // ── Global Error Handler ──────────────────────────────────────────────────────
 app.use(errorHandler);

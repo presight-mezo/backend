@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { scoresDb } from "../db/schema.js";
+import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -9,6 +10,24 @@ const router = Router();
  *   name: Profile
  *   description: User-specific prediction statistics
  */
+
+/**
+ * @swagger
+ * /api/v1/profile:
+ *   get:
+ *     summary: Get current authenticated user address
+ *     tags: [Profile]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User address retrieved
+ *       401:
+ *         description: Unauthorized
+ */
+router.get("/", requireAuth, (req: Request, res: Response) => {
+  res.json({ address: req.userAddress });
+});
 
 /**
  * @swagger
