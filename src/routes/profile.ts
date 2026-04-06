@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { scoresDb } from "../db/schema.js";
+import { scoresDb, usersDb, mandatesDb } from "../db/schema.js";
 import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
@@ -8,25 +8,80 @@ const router = Router();
  * @swagger
  * tags:
  *   name: Profile
- *   description: User-specific prediction statistics
+ *   description: User-specific prediction statistics and profile info
  */
 
 /**
  * @swagger
  * /api/v1/profile:
  *   get:
- *     summary: Get current authenticated user address
+ *     summary: Get current authenticated user profile
  *     tags: [Profile]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: User address retrieved
+ *         description: User profile retrieved
  *       401:
  *         description: Unauthorized
  */
 router.get("/", requireAuth, (req: Request, res: Response) => {
-  res.json({ address: req.userAddress });
+  const address = req.userAddress!.toLowerCase();
+  let userRecord = usersDb.get(address);
+  const mandateRecord = mandatesDb.get(address);
+
+  // Default values if no user record exists
+  if (!userRecord) {
+    userRecord = {
+      address,
+      default_risk_mode: 'full-stake',
+      onboarding_completed: 0
+    };
+  }
+  
+  res.json({ 
+    address,
+    defaultRiskMode: userRecord.default_risk_mode,
+    onboardingCompleted: userRecord.onboarding_completed === 1,
+    hasMandate: !!mandateRecord
+  });
+});
+
+/**
+ * @swagger
+ * /api/v1/profile/onboard:
+ *   post:
+ *     summary: Set user onboarding preference
+ *     tags: [Profile]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               defaultRiskMode:
+ *                 type: string
+ *                 enum: [zero-risk, full-stake]
+ *     responses:
+ *       200:
+ *         description: Onboarding complete
+ *       400:
+ *         description: Invalid input
+ */
+router.post("/onboard", requireAuth, (req: Request, res: Response) => {
+  const address = req.userAddress!.toLowerCase();
+  const { defaultRiskMode } = req.body;
+  
+  if (!defaultRiskMode || (defaultRiskMode !== 'zero-risk' && defaultRiskMode !== 'full-stake')) {
+    res.status(400).json({ error: "Invalid defaultRiskMode. Must be 'zero-risk' or 'full-stake'" });
+    return;
+  }
+
+  usersDb.upsert(address, defaultRiskMode, true);
+  res.json({ success: true, defaultRiskMode, onboardingCompleted: true });
 });
 
 /**

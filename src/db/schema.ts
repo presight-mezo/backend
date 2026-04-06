@@ -4,6 +4,13 @@ import { db } from "./client.js";
 
 export function migrateDb() {
   db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      address              TEXT PRIMARY KEY,
+      default_risk_mode    TEXT NOT NULL DEFAULT 'full-stake',
+      onboarding_completed INTEGER NOT NULL DEFAULT 0,
+      created_at           TEXT DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS groups (
       id           TEXT PRIMARY KEY,
       name         TEXT NOT NULL,
@@ -77,6 +84,32 @@ export function migrateDb() {
     );
   `);
 }
+
+// ── Users CRUD ────────────────────────────────────────────────────────────────
+
+export interface UserRecord {
+  address: string;
+  default_risk_mode: string;
+  onboarding_completed: number;
+}
+
+export const usersDb = {
+  get(address: string): UserRecord | undefined {
+    return db
+      .prepare("SELECT * FROM users WHERE address = ?")
+      .get(address.toLowerCase()) as any;
+  },
+
+  upsert(address: string, default_risk_mode: string, onboarding_completed: boolean) {
+    db.prepare(`
+      INSERT INTO users (address, default_risk_mode, onboarding_completed)
+      VALUES (?, ?, ?)
+      ON CONFLICT (address) DO UPDATE SET
+        default_risk_mode = excluded.default_risk_mode,
+        onboarding_completed = excluded.onboarding_completed
+    `).run(address.toLowerCase(), default_risk_mode, onboarding_completed ? 1 : 0);
+  },
+};
 
 // ── Mandate CRUD ──────────────────────────────────────────────────────────────
 
