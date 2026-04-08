@@ -181,6 +181,19 @@ export const groupsDb = {
       .prepare("SELECT address, joined_at FROM group_members WHERE group_id = ? ORDER BY joined_at ASC")
       .all(groupId) as any[];
   },
+
+  getByUser(address: string) {
+    return db
+      .prepare(`
+        SELECT g.*, 
+               (SELECT COUNT(*) FROM group_members m WHERE m.group_id = g.id) as _count_members 
+        FROM groups g
+        JOIN group_members gm ON g.id = gm.group_id
+        WHERE gm.address = ?
+        ORDER BY g.created_at DESC
+      `)
+      .all(address.toLowerCase()) as any[];
+  },
 };
 
 // ── Markets CRUD ──────────────────────────────────────────────────────────────

@@ -66,6 +66,38 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
 
 /**
  * @swagger
+ * /api/v1/groups:
+ *   get:
+ *     summary: List all groups the user is a member of
+ *     tags: [Groups]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of groups
+ *       401:
+ *         description: Unauthorized
+ */
+router.get("/", requireAuth, (req: Request, res: Response) => {
+  try {
+    const rawGroups = groupsDb.getByUser(req.userAddress!);
+    const groups = rawGroups.map((g: any) => ({
+      id: g.id,
+      name: g.name,
+      adminAddress: g.admin_address,
+      createdAt: g.created_at,
+      _count: {
+        members: g._count_members
+      }
+    }));
+    res.json(groups);
+  } catch (err: any) {
+    res.status(500).json({ error: "FAILED_TO_FETCH_GROUPS" });
+  }
+});
+
+/**
+ * @swagger
  * /api/v1/groups/{groupId}:
  *   get:
  *     summary: Get group metadata and leaderboard
