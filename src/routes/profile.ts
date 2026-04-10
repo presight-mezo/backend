@@ -43,8 +43,55 @@ router.get("/", requireAuth, (req: Request, res: Response) => {
     address,
     defaultRiskMode: userRecord.default_risk_mode,
     onboardingCompleted: userRecord.onboarding_completed === 1,
-    hasMandate: !!mandateRecord
+    hasMandate: !!mandateRecord,
+    username: userRecord.username,
+    bio: userRecord.bio,
+    avatarUrl: userRecord.avatar_url,
+    twitter: userRecord.twitter
   });
+});
+
+/**
+ * @swagger
+ * /api/v1/profile:
+ *   patch:
+ *     summary: Update current authenticated user profile
+ *     tags: [Profile]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               username:
+ *                 type: string
+ *               bio:
+ *                 type: string
+ *               avatarUrl:
+ *                 type: string
+ *               twitter:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Profile updated
+ *       400:
+ *         description: Invalid input
+ */
+router.patch("/", requireAuth, (req: Request, res: Response) => {
+  const address = req.userAddress!.toLowerCase();
+  const { username, bio, avatarUrl, twitter } = req.body;
+  
+  usersDb.updateProfile(address, {
+    username,
+    bio,
+    avatar_url: avatarUrl,
+    twitter
+  });
+  
+  res.json({ success: true });
 });
 
 /**
@@ -139,6 +186,54 @@ router.get("/:groupId/:address", (req: Request, res: Response) => {
     totalStaked:     scoreRecord.total_staked,
     totalWon:        scoreRecord.total_won,
     convictionScore: scoreRecord.score,
+  });
+});
+
+/**
+ * @swagger
+ * /api/v1/profile/{address}/global:
+ *   get:
+ *     summary: Get global aggregated profile for any user address
+ *     tags: [Profile]
+ *     parameters:
+ *       - in: path
+ *         name: address
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Global profile data retrieved
+ *       404:
+ *         description: User not found
+ */
+router.get("/:address/global", (req: Request, res: Response) => {
+  const address = (req.params.address as string).toLowerCase();
+  const globalStats = scoresDb.getGlobal(address);
+  const userRecord = usersDb.get(address);
+
+  if (!globalStats && !userRecord) {
+    res.status(404).json({ error: "USER_NOT_FOUND" });
+    return;
+  }
+
+  const winRate = globalStats && globalStats.marketsPlayed > 0 
+    ? globalStats.wins / globalStats.marketsPlayed 
+    : 0;
+
+  res.json({
+    address,
+    totalConvictionScore: globalStats?.totalScore ?? 0,
+    marketsPlayed: globalStats?.marketsPlayed ?? 0,
+    winRate: winRate,
+    totalStaked: globalStats?.totalStaked ?? "0",
+    totalWon: globalStats?.totalWon ?? "0",
+    defaultRiskMode: userRecord?.default_risk_mode ?? 'full-stake',
+    onboardingCompleted: userRecord?.onboarding_completed === 1,
+    username: userRecord?.username,
+    bio: userRecord?.bio,
+    avatarUrl: userRecord?.avatar_url,
+    twitter: userRecord?.twitter
   });
 });
 

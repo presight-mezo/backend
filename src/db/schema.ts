@@ -8,6 +8,10 @@ export function migrateDb() {
       address              TEXT PRIMARY KEY,
       default_risk_mode    TEXT NOT NULL DEFAULT 'full-stake',
       onboarding_completed INTEGER NOT NULL DEFAULT 0,
+      username             TEXT,
+      bio                  TEXT,
+      avatar_url           TEXT,
+      twitter              TEXT,
       created_at           TEXT DEFAULT (datetime('now'))
     );
 
@@ -83,6 +87,23 @@ export function migrateDb() {
       last_block INTEGER NOT NULL DEFAULT 0
     );
   `);
+
+  // Safe migrations for newly added columns
+  const alters = [
+    "ALTER TABLE users ADD COLUMN username TEXT",
+    "ALTER TABLE users ADD COLUMN bio TEXT",
+    "ALTER TABLE users ADD COLUMN avatar_url TEXT",
+    "ALTER TABLE users ADD COLUMN twitter TEXT"
+  ];
+  for (const query of alters) {
+    try {
+      db.exec(query);
+    } catch (e: any) {
+      if (!e.message.includes("duplicate column name")) {
+        console.error("Migration error:", e.message);
+      }
+    }
+  }
 }
 
 // ── Users CRUD ────────────────────────────────────────────────────────────────
@@ -91,6 +112,10 @@ export interface UserRecord {
   address: string;
   default_risk_mode: string;
   onboarding_completed: number;
+  username?: string;
+  bio?: string;
+  avatar_url?: string;
+  twitter?: string;
 }
 
 export const usersDb = {
@@ -108,6 +133,23 @@ export const usersDb = {
         default_risk_mode = excluded.default_risk_mode,
         onboarding_completed = excluded.onboarding_completed
     `).run(address.toLowerCase(), default_risk_mode, onboarding_completed ? 1 : 0);
+  },
+
+  updateProfile(address: string, data: { username?: string; bio?: string; avatar_url?: string; twitter?: string }) {
+    db.prepare(`
+      UPDATE users SET
+        username = COALESCE(?, username),
+        bio = COALESCE(?, bio),
+        avatar_url = COALESCE(?, avatar_url),
+        twitter = COALESCE(?, twitter)
+      WHERE address = ?
+    `).run(
+      data.username !== undefined ? data.username : null,
+      data.bio !== undefined ? data.bio : null,
+      data.avatar_url !== undefined ? data.avatar_url : null,
+      data.twitter !== undefined ? data.twitter : null,
+      address.toLowerCase()
+    );
   },
 };
 
@@ -299,6 +341,40 @@ export const scoresDb = {
         LIMIT 100
       `)
       .all(groupId) as any[];
+  },
+
+  getGlobal(userAddress: string) {
+    const rows = db
+      .prepare(`
+        SELECT score, markets_played, wins, total_staked, total_won
+        FROM conviction_scores
+        WHERE user_address = ?
+      `)
+      .all(userAddress.toLowerCase()) as any[];
+
+    if (rows.length === 0) return undefined;
+
+    let totalScore = 0;
+    let marketsPlayed = 0;
+    let wins = 0;
+    let totalStaked = BigInt(0);
+    let totalWon = BigInt(0);
+
+    for (const row of rows) {
+      totalScore += row.score;
+      marketsPlayed += row.markets_played;
+      wins += row.wins;
+      totalStaked += BigInt(row.total_staked || "0");
+      totalWon += BigInt(row.total_won || "0");
+    }
+
+    return {
+      totalScore,
+      marketsPlayed,
+      wins,
+      totalStaked: totalStaked.toString(),
+      totalWon: totalWon.toString(),
+    };
   },
 
   increment(userAddress: string, groupId: string, delta: {
