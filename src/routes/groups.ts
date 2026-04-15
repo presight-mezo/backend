@@ -40,7 +40,7 @@ const router = Router();
  *         description: Unauthorized
  */
 router.post("/", requireAuth, async (req: Request, res: Response) => {
-  const { name } = req.body;
+  const { name, description, isPrivate } = req.body;
   if (!name?.trim()) {
     res.status(400).json({ error: "BAD_REQUEST", message: "name is required" });
     return;
@@ -48,7 +48,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
 
   try {
     const { groupId, txHash } = await relayCreateGroup(name.trim());
-    groupsDb.create(groupId, name.trim(), req.userAddress!);
+    groupsDb.create(groupId, name.trim(), req.userAddress!, description, isPrivate);
     groupsDb.addMember(groupId, req.userAddress!);
 
     res.status(201).json({
@@ -129,6 +129,8 @@ router.get("/:groupId", (req: Request, res: Response) => {
   const scoresMap = new Map(scores.map((s: any) => [s.user_address, s]));
   const enrichedMembers = members.map((m: any) => ({
     address:        m.address,
+    username:       m.username,
+    avatarUrl:      m.avatar_url,
     convictionScore: scoresMap.get(m.address)?.score ?? 0,
     joinedAt:       m.joined_at,
   }));
@@ -136,6 +138,8 @@ router.get("/:groupId", (req: Request, res: Response) => {
   res.json({
     groupId,
     name:             group.name,
+    description:      group.description,
+    isPrivate:        !!group.is_private,
     adminAddress:     group.admin_address,
     memberCount:      members.length,
     members:          enrichedMembers,
@@ -214,6 +218,157 @@ router.get("/:groupId/leaderboard", (req: Request, res: Response) => {
   }));
 
   res.json({ groupId, entries, updatedAt: new Date().toISOString() });
+});
+
+/**
+ * @swagger
+ * /api/v1/groups/{groupId}:
+ *   put:
+ *     summary: Update group metadata (Admin only)
+ *     tags: [Groups]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               isPrivate:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Updated successfully
+ */
+router.put("/:groupId", requireAuth, (req: Request, res: Response) => {
+  const groupId = req.params.groupId as string;
+  const group = groupsDb.get(groupId);
+  if (!group || group.archived === 1) {
+    res.status(404).json({ error: "GROUP_NOT_FOUND" });
+    return;
+  }
+  if (group.admin_address.toLowerCase() !== req.userAddress!.toLowerCase()) {
+    res.status(403).json({ error: "NOT_ADMIN" });
+    return;
+  }
+
+  const { name, description, isPrivate } = req.body;
+  groupsDb.update(groupId, { name, description, isPrivate });
+  res.json({ success: true });
+});
+
+/**
+ * @swagger
+ * /api/v1/groups/{groupId}:
+ *   delete:
+ *     summary: Archive a group (Admin only)
+ *     tags: [Groups]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *     responses:
+ *       200:
+ *         description: Archived successfully
+ */
+router.delete("/:groupId", requireAuth, (req: Request, res: Response) => {
+  const groupId = req.params.groupId as string;
+  const group = groupsDb.get(groupId);
+  if (!group || group.archived === 1) {
+    res.status(404).json({ error: "GROUP_NOT_FOUND" });
+    return;
+  }
+  if (group.admin_address.toLowerCase() !== req.userAddress!.toLowerCase()) {
+    res.status(403).json({ error: "NOT_ADMIN" });
+    return;
+  }
+
+  groupsDb.archive(groupId);
+  res.json({ success: true, archived: true });
+});
+
+/**
+ * @swagger
+ * /api/v1/groups/{groupId}/leave:
+ *   delete:
+ *     summary: Leave a group
+ *     tags: [Groups]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *     responses:
+ *       200:
+ *         description: Left successfully
+ */
+router.delete("/:groupId/leave", requireAuth, (req: Request, res: Response) => {
+  const groupId = req.params.groupId as string;
+  const group = groupsDb.get(groupId);
+  if (!group || group.archived === 1) {
+    res.status(404).json({ error: "GROUP_NOT_FOUND" });
+    return;
+  }
+  // Optional: Prevent admin from leaving without transferring ownership
+  if (group.admin_address.toLowerCase() === req.userAddress!.toLowerCase()) {
+    res.status(400).json({ error: "ADMIN_CANNOT_LEAVE" });
+    return;
+  }
+
+  groupsDb.removeMember(groupId, req.userAddress!);
+  res.json({ success: true });
+});
+
+/**
+ * @swagger
+ * /api/v1/groups/{groupId}/members/{address}:
+ *   delete:
+ *     summary: Kick a member (Admin only)
+ *     tags: [Groups]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *       - in: path
+ *         name: address
+ *         required: true
+ *     responses:
+ *       200:
+ *         description: Kicked successfully
+ */
+router.delete("/:groupId/members/:address", requireAuth, (req: Request, res: Response) => {
+  const groupId = req.params.groupId as string;
+  const group = groupsDb.get(groupId);
+  if (!group || group.archived === 1) {
+    res.status(404).json({ error: "GROUP_NOT_FOUND" });
+    return;
+  }
+  if (group.admin_address.toLowerCase() !== req.userAddress!.toLowerCase()) {
+    res.status(403).json({ error: "NOT_ADMIN" });
+    return;
+  }
+  const targetAddress = req.params.address as string;
+  if (group.admin_address.toLowerCase() === targetAddress.toLowerCase()) {
+    res.status(400).json({ error: "CANNOT_KICK_ADMIN" });
+    return;
+  }
+
+  groupsDb.removeMember(groupId, targetAddress);
+  res.json({ success: true });
 });
 
 export default router;

@@ -34,7 +34,8 @@ const app = express();
 
 app.use(cors({ origin: CORS_ORIGIN, credentials: true }));
 app.use(morgan("dev"));
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
 // ── Swagger ──────────────────────────────────────────────────────────────────
 const swaggerOptions = {

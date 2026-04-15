@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
-import { marketsDb, trovesDb } from "../db/schema.js";
+import { marketsDb, trovesDb, stakesDb } from "../db/schema.js";
 import { calculateYield } from "../services/yieldSimulator.js";
+import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -10,6 +11,48 @@ const router = Router();
  *   name: Yield
  *   description: Time-based yield accrual simulation for Zero Risk mode
  */
+
+/**
+ * @swagger
+ * /api/v1/yield/accrued:
+ *   get:
+ *     summary: Get total live accrued yield across all markets for the connected user
+ *     tags: [Yield]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Total accrued MUSD yield
+ */
+router.get("/accrued", requireAuth, (req: Request, res: Response) => {
+  const userAddress = req.userAddress!;
+  const trove = trovesDb.get(userAddress);
+  
+  if (!trove) {
+    res.json({ accruedYield: "0", troveBalance: "0" });
+    return;
+  }
+
+  const troveBalanceStr = trove.trove_balance;
+  const troveBalanceBig = BigInt(troveBalanceStr);
+
+  const openMarkets = marketsDb.getOpenZeroRisk();
+  let totalAccrued = 0n;
+
+  for (const m of openMarkets) {
+    if (stakesDb.hasStaked(m.id, userAddress)) {
+      const openedAt = new Date(m.created_at);
+      totalAccrued += calculateYield(troveBalanceBig, openedAt);
+    }
+  }
+
+  res.json({
+    userAddress,
+    troveBalance: troveBalanceStr,
+    accruedYield: totalAccrued.toString(),
+    timestamp: new Date().toISOString(),
+  });
+});
 
 /**
  * @swagger

@@ -54,7 +54,8 @@ async function main() {
   const predictionMarket = await PredictionMarket.deploy(
     musdAddress,
     protocolFeeAddress,
-    mandateValidatorAddress
+    mandateValidatorAddress,
+    groupRegistryAddress
   );
   await predictionMarket.waitForDeployment();
   const predictionMarketAddress = await predictionMarket.getAddress();

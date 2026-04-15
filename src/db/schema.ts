@@ -18,6 +18,9 @@ export function migrateDb() {
     CREATE TABLE IF NOT EXISTS groups (
       id           TEXT PRIMARY KEY,
       name         TEXT NOT NULL,
+      description  TEXT,
+      is_private   INTEGER NOT NULL DEFAULT 0,
+      archived     INTEGER NOT NULL DEFAULT 0,
       admin_address TEXT NOT NULL,
       created_at   TEXT DEFAULT (datetime('now'))
     );
@@ -93,7 +96,10 @@ export function migrateDb() {
     "ALTER TABLE users ADD COLUMN username TEXT",
     "ALTER TABLE users ADD COLUMN bio TEXT",
     "ALTER TABLE users ADD COLUMN avatar_url TEXT",
-    "ALTER TABLE users ADD COLUMN twitter TEXT"
+    "ALTER TABLE users ADD COLUMN twitter TEXT",
+    "ALTER TABLE groups ADD COLUMN description TEXT",
+    "ALTER TABLE groups ADD COLUMN is_private INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE groups ADD COLUMN archived INTEGER NOT NULL DEFAULT 0"
   ];
   for (const query of alters) {
     try {
@@ -193,15 +199,47 @@ export const groupsDb = {
     return db.prepare("SELECT * FROM groups WHERE id = ?").get(groupId) as any;
   },
 
-  create(id: string, name: string, adminAddress: string) {
-    db.prepare("INSERT INTO groups (id, name, admin_address) VALUES (?, ?, ?)")
-      .run(id, name, adminAddress.toLowerCase());
+  create(id: string, name: string, adminAddress: string, description?: string, isPrivate?: boolean) {
+    db.prepare(`
+      INSERT INTO groups (id, name, admin_address, description, is_private) 
+      VALUES (?, ?, ?, ?, ?)
+    `).run(
+      id, 
+      name, 
+      adminAddress.toLowerCase(), 
+      description || null, 
+      isPrivate ? 1 : 0
+    );
   },
 
   addMember(groupId: string, address: string) {
     db.prepare(`
       INSERT OR IGNORE INTO group_members (group_id, address) VALUES (?, ?)
     `).run(groupId, address.toLowerCase());
+  },
+
+  removeMember(groupId: string, address: string) {
+    db.prepare("DELETE FROM group_members WHERE group_id = ? AND address = ?")
+      .run(groupId, address.toLowerCase());
+  },
+
+  update(id: string, data: { name?: string; description?: string; isPrivate?: boolean }) {
+    db.prepare(`
+      UPDATE groups SET
+        name = COALESCE(?, name),
+        description = COALESCE(?, description),
+        is_private = COALESCE(?, is_private)
+      WHERE id = ?
+    `).run(
+      data.name !== undefined ? data.name : null,
+      data.description !== undefined ? data.description : null,
+      data.isPrivate !== undefined ? (data.isPrivate ? 1 : 0) : null,
+      id
+    );
+  },
+
+  archive(id: string) {
+    db.prepare("UPDATE groups SET archived = 1 WHERE id = ?").run(id);
   },
 
   isMember(groupId: string, address: string): boolean {
@@ -220,7 +258,13 @@ export const groupsDb = {
 
   members(groupId: string) {
     return db
-      .prepare("SELECT address, joined_at FROM group_members WHERE group_id = ? ORDER BY joined_at ASC")
+      .prepare(`
+        SELECT gm.address, gm.joined_at, u.username, u.avatar_url
+        FROM group_members gm
+        LEFT JOIN users u ON gm.address = u.address
+        WHERE gm.group_id = ? 
+        ORDER BY gm.joined_at ASC
+      `)
       .all(groupId) as any[];
   },
 
@@ -231,7 +275,7 @@ export const groupsDb = {
                (SELECT COUNT(*) FROM group_members m WHERE m.group_id = g.id) as _count_members 
         FROM groups g
         JOIN group_members gm ON g.id = gm.group_id
-        WHERE gm.address = ?
+        WHERE gm.address = ? AND g.archived = 0
         ORDER BY g.created_at DESC
       `)
       .all(address.toLowerCase()) as any[];
@@ -304,6 +348,12 @@ export const stakesDb = {
       .prepare("SELECT 1 FROM stakes WHERE market_id = ? AND user_address = ?")
       .get(marketId, userAddress.toLowerCase());
     return !!row;
+  },
+
+  get(marketId: string, userAddress: string) {
+    return db
+      .prepare("SELECT * FROM stakes WHERE market_id = ? AND user_address = ?")
+      .get(marketId, userAddress.toLowerCase()) as any;
   },
 
   create(data: {

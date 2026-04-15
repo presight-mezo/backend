@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./MandateValidator.sol";
+import "./GroupRegistry.sol";
 
 /// @title PredictionMarket
 /// @notice Core Presight escrow contract. Holds MUSD, manages YES/NO staking,
@@ -31,6 +32,7 @@ contract PredictionMarket is ReentrancyGuard {
     IERC20 public immutable musd;
     address public immutable protocolFeeAddr;
     MandateValidator public immutable mandateValidator;
+    GroupRegistry public immutable groupRegistry;
 
     // ─── Structs ────────────────────────────────────────────────────────────────
 
@@ -127,17 +129,20 @@ contract PredictionMarket is ReentrancyGuard {
     /// @param _musd             MUSD ERC-20 address on Mezo Testnet.
     /// @param _protocolFeeAddr  Address that receives the 1% platform fee (immutable).
     /// @param _mandateValidator Deployed MandateValidator contract.
+    /// @param _groupRegistry    Deployed GroupRegistry contract.
     constructor(
         address _musd,
         address _protocolFeeAddr,
-        address _mandateValidator
+        address _mandateValidator,
+        address _groupRegistry
     ) {
-        if (_musd == address(0) || _protocolFeeAddr == address(0) || _mandateValidator == address(0))
+        if (_musd == address(0) || _protocolFeeAddr == address(0) || _mandateValidator == address(0) || _groupRegistry == address(0))
             revert ZeroAddress();
 
         musd             = IERC20(_musd);
         protocolFeeAddr  = _protocolFeeAddr;
         mandateValidator = MandateValidator(_mandateValidator);
+        groupRegistry    = GroupRegistry(_groupRegistry);
     }
 
     // ─── Market Creation ─────────────────────────────────────────────────────
@@ -160,6 +165,10 @@ contract PredictionMarket is ReentrancyGuard {
         if (bytes(question).length == 0) revert EmptyQuestion();
         if (deadline <= block.timestamp) revert InvalidDeadline();
         if (resolver == address(0)) revert ZeroAddress();
+
+        (, address admin,, bool exists) = groupRegistry.getGroup(groupId);
+        if (!exists) revert MarketNotFound(groupId); // Or define GroupNotFound error, but MarketNotOpen works initially
+        require(admin == msg.sender, "PredictionMarket: only group admin can create market");
 
         marketId = keccak256(
             abi.encodePacked(groupId, question, deadline, resolver, block.timestamp, msg.sender)

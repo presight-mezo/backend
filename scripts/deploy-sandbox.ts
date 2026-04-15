@@ -22,23 +22,23 @@ async function main() {
   const mvAddr = await mv.getAddress();
   console.log("✅ MandateValidator deployed to:", mvAddr);
 
-  // 3. Deploy PredictionMarket
-  const PredictionMarket = await ethers.getContractFactory("PredictionMarket");
-  const pm = await PredictionMarket.deploy(musdAddr, FEE_ADDR, mvAddr);
-  await pm.waitForDeployment();
-  const pmAddr = await pm.getAddress();
-  console.log("✅ PredictionMarket deployed to:", pmAddr);
-
-  // 4. Wire PM -> MV
-  await (await (mv as any).setPredictionMarket(pmAddr)).wait();
-  console.log("✅ MandateValidator wired to PredictionMarket");
-
-  // 5. Deploy GroupRegistry
+  // 3. Deploy GroupRegistry
   const GroupRegistry = await ethers.getContractFactory("GroupRegistry");
   const gr = await GroupRegistry.deploy();
   await gr.waitForDeployment();
   const grAddr = await gr.getAddress();
   console.log("✅ GroupRegistry deployed to:", grAddr);
+
+  // 4. Deploy PredictionMarket
+  const PredictionMarket = await ethers.getContractFactory("PredictionMarket");
+  const pm = await PredictionMarket.deploy(musdAddr, FEE_ADDR, mvAddr, grAddr);
+  await pm.waitForDeployment();
+  const pmAddr = await pm.getAddress();
+  console.log("✅ PredictionMarket deployed to:", pmAddr);
+
+  // 5. Wire PM -> MV
+  await (await (mv as any).setPredictionMarket(pmAddr)).wait();
+  console.log("✅ MandateValidator wired to PredictionMarket");
 
   // Save to sandbox sidecar
   const sandbox = {
