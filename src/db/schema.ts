@@ -141,19 +141,21 @@ export const usersDb = {
     `).run(address.toLowerCase(), default_risk_mode, onboarding_completed ? 1 : 0);
   },
 
-  updateProfile(address: string, data: { username?: string; bio?: string; avatar_url?: string; twitter?: string }) {
+  updateProfile(address: string, data: { username?: string; bio?: string; avatar_url?: string; twitter?: string; default_risk_mode?: string }) {
     db.prepare(`
       UPDATE users SET
         username = COALESCE(?, username),
         bio = COALESCE(?, bio),
         avatar_url = COALESCE(?, avatar_url),
-        twitter = COALESCE(?, twitter)
+        twitter = COALESCE(?, twitter),
+        default_risk_mode = COALESCE(?, default_risk_mode)
       WHERE address = ?
     `).run(
-      data.username !== undefined ? data.username : null,
-      data.bio !== undefined ? data.bio : null,
-      data.avatar_url !== undefined ? data.avatar_url : null,
-      data.twitter !== undefined ? data.twitter : null,
+      data.username ?? null,
+      data.bio ?? null,
+      data.avatar_url ?? null,
+      data.twitter ?? null,
+      data.default_risk_mode ?? null,
       address.toLowerCase()
     );
   },
@@ -384,13 +386,35 @@ export const scoresDb = {
   getLeaderboard(groupId: string) {
     return db
       .prepare(`
-        SELECT user_address, score, markets_played, wins, total_staked, total_won
-        FROM conviction_scores
-        WHERE group_id = ?
+        SELECT gm.address as user_address, 
+               COALESCE(cs.score, 0) as score, 
+               COALESCE(cs.markets_played, 0) as markets_played, 
+               COALESCE(cs.wins, 0) as wins,
+               u.username,
+               u.avatar_url
+        FROM group_members gm
+        LEFT JOIN conviction_scores cs ON gm.address = cs.user_address AND gm.group_id = cs.group_id
+        LEFT JOIN users u ON gm.address = u.address
+        WHERE gm.group_id = ?
         ORDER BY score DESC
         LIMIT 100
       `)
       .all(groupId) as any[];
+  },
+
+  getGlobalLeaderboard(limit: number = 100) {
+    return db
+      .prepare(`
+        SELECT user_address, 
+               SUM(score) as score, 
+               SUM(markets_played) as markets_played, 
+               SUM(wins) as wins
+        FROM conviction_scores
+        GROUP BY user_address
+        ORDER BY score DESC
+        LIMIT ?
+      `)
+      .all(limit) as any[];
   },
 
   getGlobal(userAddress: string) {

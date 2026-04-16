@@ -212,6 +212,8 @@ router.get("/:groupId/leaderboard", (req: Request, res: Response) => {
   const entries = scoresDb.getLeaderboard(groupId).map((e: any, i: number) => ({
     rank:           i + 1,
     address:        e.user_address,
+    username:       e.username,
+    avatarUrl:      e.avatar_url,
     convictionScore: e.score,
     winRate:        e.markets_played > 0 ? e.wins / e.markets_played : 0,
     marketsPlayed:  e.markets_played,

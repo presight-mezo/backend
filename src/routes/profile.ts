@@ -82,13 +82,14 @@ router.get("/", requireAuth, (req: Request, res: Response) => {
  */
 router.patch("/", requireAuth, (req: Request, res: Response) => {
   const address = req.userAddress!.toLowerCase();
-  const { username, bio, avatarUrl, twitter } = req.body;
+  const { username, bio, avatarUrl, twitter, defaultRiskMode } = req.body;
   
   usersDb.updateProfile(address, {
     username,
     bio,
     avatar_url: avatarUrl,
-    twitter
+    twitter,
+    default_risk_mode: defaultRiskMode
   });
   
   res.json({ success: true });
@@ -129,6 +130,34 @@ router.post("/onboard", requireAuth, (req: Request, res: Response) => {
 
   usersDb.upsert(address, defaultRiskMode, true);
   res.json({ success: true, defaultRiskMode, onboardingCompleted: true });
+});
+
+/**
+ * @swagger
+ * /api/v1/profile/leaderboard:
+ *   get:
+ *     summary: Get the global aggregated leaderboard
+ *     tags: [Profile]
+ *     responses:
+ *       200:
+ *         description: Global leaderboard retrieved
+ */
+router.get("/leaderboard", (req: Request, res: Response) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 100;
+    const entries = scoresDb.getGlobalLeaderboard(limit).map((e: any, i: number) => ({
+      rank: i + 1,
+      address: e.user_address,
+      convictionScore: e.score,
+      winRate: e.markets_played > 0 ? Math.round((e.wins / e.markets_played) * 100) : 0,
+      marketsPlayed: e.markets_played,
+      wins: e.wins
+    }));
+
+    res.json({ entries, updatedAt: new Date().toISOString() });
+  } catch (err: any) {
+    res.status(500).json({ error: "FAILED_TO_FETCH_GLOBAL_LEADERBOARD" });
+  }
 });
 
 /**
