@@ -274,7 +274,8 @@ export const groupsDb = {
     return db
       .prepare(`
         SELECT g.*, 
-               (SELECT COUNT(*) FROM group_members m WHERE m.group_id = g.id) as _count_members 
+               (SELECT COUNT(*) FROM group_members m WHERE m.group_id = g.id) as _count_members,
+               (SELECT COUNT(*) FROM markets mk WHERE mk.group_id = g.id AND mk.status = 'OPEN') as _count_active_markets
         FROM groups g
         JOIN group_members gm ON g.id = gm.group_id
         WHERE gm.address = ? AND g.archived = 0
@@ -295,6 +296,12 @@ export const marketsDb = {
     return db
       .prepare("SELECT * FROM markets WHERE group_id = ? ORDER BY status = 'OPEN' DESC, deadline ASC")
       .all(groupId) as any[];
+  },
+
+  getAll(limit: number = 20) {
+    return db
+      .prepare("SELECT * FROM markets WHERE status = 'OPEN' ORDER BY deadline ASC LIMIT ?")
+      .all(limit) as any[];
   },
 
   getByResolverAndStatus(resolverAddress: string, status: string) {

@@ -87,7 +87,8 @@ router.get("/", requireAuth, (req: Request, res: Response) => {
       adminAddress: g.admin_address,
       createdAt: g.created_at,
       _count: {
-        members: g._count_members
+        members: g._count_members,
+        activeMarkets: g._count_active_markets
       }
     }));
     res.json(groups);

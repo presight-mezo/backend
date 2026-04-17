@@ -185,11 +185,9 @@ router.get("/:marketId", optionalAuth, (req: Request, res: Response) => {
  */
 router.get("/", (req: Request, res: Response) => {
   const { groupId } = req.query;
-  if (!groupId) {
-    res.status(400).json({ error: "BAD_REQUEST", message: "groupId query param required" });
-    return;
-  }
-  const rawMarkets = marketsDb.getByGroup(groupId as string);
+  const rawMarkets = groupId 
+    ? marketsDb.getByGroup(groupId as string)
+    : marketsDb.getAll(50);
   
   const markets = rawMarkets.map((m: any) => ({
     id:               m.id,
