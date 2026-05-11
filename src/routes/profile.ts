@@ -183,11 +183,6 @@ router.get("/:address/global", (req: Request, res: Response) => {
   const globalStats = scoresDb.getGlobal(address);
   const userRecord = usersDb.get(address);
 
-  if (!globalStats && !userRecord) {
-    res.status(404).json({ error: "USER_NOT_FOUND" });
-    return;
-  }
-
   const winRate = globalStats && globalStats.marketsPlayed > 0 
     ? globalStats.wins / globalStats.marketsPlayed 
     : 0;

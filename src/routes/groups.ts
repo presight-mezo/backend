@@ -40,7 +40,7 @@ const router = Router();
  *         description: Unauthorized
  */
 router.post("/", requireAuth, async (req: Request, res: Response) => {
-  const { name, description, isPrivate } = req.body;
+  const { name, description, isPrivate, avatarUrl } = req.body;
   if (!name?.trim()) {
     res.status(400).json({ error: "BAD_REQUEST", message: "name is required" });
     return;
@@ -48,7 +48,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
 
   try {
     const { groupId, txHash } = await relayCreateGroup(name.trim());
-    groupsDb.create(groupId, name.trim(), req.userAddress!, description, isPrivate);
+    groupsDb.create(groupId, name.trim(), req.userAddress!, description, isPrivate, avatarUrl);
     groupsDb.addMember(groupId, req.userAddress!);
 
     res.status(201).json({
@@ -86,6 +86,9 @@ router.get("/", requireAuth, (req: Request, res: Response) => {
       name: g.name,
       adminAddress: g.admin_address,
       createdAt: g.created_at,
+      avatarUrl: g.avatar_url,
+      memberCount: g._count_members,
+      activeMarketCount: g._count_active_markets,
       _count: {
         members: g._count_members,
         activeMarkets: g._count_active_markets
@@ -141,6 +144,7 @@ router.get("/:groupId", (req: Request, res: Response) => {
     name:             group.name,
     description:      group.description,
     isPrivate:        !!group.is_private,
+    avatarUrl:        group.avatar_url,
     adminAddress:     group.admin_address,
     memberCount:      members.length,
     members:          enrichedMembers,
@@ -264,8 +268,8 @@ router.put("/:groupId", requireAuth, (req: Request, res: Response) => {
     return;
   }
 
-  const { name, description, isPrivate } = req.body;
-  groupsDb.update(groupId, { name, description, isPrivate });
+  const { name, description, isPrivate, avatarUrl } = req.body;
+  groupsDb.update(groupId, { name, description, isPrivate, avatarUrl });
   res.json({ success: true });
 });
 

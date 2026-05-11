@@ -204,7 +204,7 @@ router.get("/", (req: Request, res: Response) => {
     resolverAddress:  m.resolver_address,
   }));
 
-  res.json(markets);
+  res.json({ markets });
 });
 
 /**

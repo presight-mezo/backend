@@ -40,6 +40,7 @@ router.get("/notifications", requireAuth, (req: Request, res: Response) => {
     const deadlineMs = new Date(m.deadline).getTime();
     const isPastDeadline = now >= deadlineMs;
     return {
+      id: m.id,
       marketId: m.id,
       groupId: m.group_id,
       question: m.question,

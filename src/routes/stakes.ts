@@ -83,6 +83,12 @@ router.post("/", requireAuth, validateMandate, async (req: Request, res: Respons
     return;
   }
 
+  // ── Enforce Integrity: Resolver cannot stake on their own market ───────────
+  if (market.resolver_address.toLowerCase() === userAddress.toLowerCase()) {
+    res.status(403).json({ error: "RESOLVER_CANNOT_PARTICIPATE", message: "As the assigned Resolver, you cannot participate in the prediction pools for this market." });
+    return;
+  }
+
   // ── Check no existing stake ───────────────────────────────────────────────────
   if (stakesDb.hasStaked(marketId, userAddress)) {
     res.status(409).json({ error: "ALREADY_STAKED", message: "You have already staked on this market" });

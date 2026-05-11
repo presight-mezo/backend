@@ -22,6 +22,7 @@ export function migrateDb() {
       is_private   INTEGER NOT NULL DEFAULT 0,
       archived     INTEGER NOT NULL DEFAULT 0,
       admin_address TEXT NOT NULL,
+      avatar_url   TEXT,
       created_at   TEXT DEFAULT (datetime('now'))
     );
 
@@ -99,7 +100,8 @@ export function migrateDb() {
     "ALTER TABLE users ADD COLUMN twitter TEXT",
     "ALTER TABLE groups ADD COLUMN description TEXT",
     "ALTER TABLE groups ADD COLUMN is_private INTEGER NOT NULL DEFAULT 0",
-    "ALTER TABLE groups ADD COLUMN archived INTEGER NOT NULL DEFAULT 0"
+    "ALTER TABLE groups ADD COLUMN archived INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE groups ADD COLUMN avatar_url TEXT"
   ];
   for (const query of alters) {
     try {
@@ -142,6 +144,10 @@ export const usersDb = {
   },
 
   updateProfile(address: string, data: { username?: string; bio?: string; avatar_url?: string; twitter?: string; default_risk_mode?: string }) {
+    const addr = address.toLowerCase();
+    // Ensure user record exists before performing UPDATE
+    db.prepare("INSERT OR IGNORE INTO users (address) VALUES (?)").run(addr);
+
     db.prepare(`
       UPDATE users SET
         username = COALESCE(?, username),
@@ -156,7 +162,7 @@ export const usersDb = {
       data.avatar_url ?? null,
       data.twitter ?? null,
       data.default_risk_mode ?? null,
-      address.toLowerCase()
+      addr
     );
   },
 };
@@ -201,16 +207,17 @@ export const groupsDb = {
     return db.prepare("SELECT * FROM groups WHERE id = ?").get(groupId) as any;
   },
 
-  create(id: string, name: string, adminAddress: string, description?: string, isPrivate?: boolean) {
+  create(id: string, name: string, adminAddress: string, description?: string, isPrivate?: boolean, avatarUrl?: string) {
     db.prepare(`
-      INSERT INTO groups (id, name, admin_address, description, is_private) 
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO groups (id, name, admin_address, description, is_private, avatar_url) 
+      VALUES (?, ?, ?, ?, ?, ?)
     `).run(
       id, 
       name, 
       adminAddress.toLowerCase(), 
       description || null, 
-      isPrivate ? 1 : 0
+      isPrivate ? 1 : 0,
+      avatarUrl || null
     );
   },
 
@@ -225,17 +232,19 @@ export const groupsDb = {
       .run(groupId, address.toLowerCase());
   },
 
-  update(id: string, data: { name?: string; description?: string; isPrivate?: boolean }) {
+  update(id: string, data: { name?: string; description?: string; isPrivate?: boolean; avatarUrl?: string }) {
     db.prepare(`
       UPDATE groups SET
         name = COALESCE(?, name),
         description = COALESCE(?, description),
-        is_private = COALESCE(?, is_private)
+        is_private = COALESCE(?, is_private),
+        avatar_url = COALESCE(?, avatar_url)
       WHERE id = ?
     `).run(
       data.name !== undefined ? data.name : null,
       data.description !== undefined ? data.description : null,
       data.isPrivate !== undefined ? (data.isPrivate ? 1 : 0) : null,
+      data.avatarUrl !== undefined ? data.avatarUrl : null,
       id
     );
   },
