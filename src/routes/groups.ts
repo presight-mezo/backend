@@ -87,6 +87,8 @@ router.get("/", requireAuth, (req: Request, res: Response) => {
       adminAddress: g.admin_address,
       createdAt: g.created_at,
       avatarUrl: g.avatar_url,
+      description: g.description,
+      isPrivate: !!g.is_private,
       memberCount: g._count_members,
       activeMarketCount: g._count_active_markets,
       _count: {
